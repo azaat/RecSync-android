@@ -36,9 +36,11 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
+import android.media.ImageReader;
 import android.media.MediaCodec;
 import android.media.MediaRecorder;
 import android.net.wifi.WifiManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Environment;
 import android.os.Handler;
@@ -58,12 +60,16 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.google.ar.core.exceptions.UnavailableApkTooOldException;
+import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
+import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
+import com.google.ar.core.exceptions.UnavailableSdkTooOldException;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
 import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
 import com.googleresearch.capturesync.softwaresync.phasealign.PhaseConfig;
-
+import com.googleresearch.capturesync.VideoHelpers;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
@@ -77,6 +83,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.FutureTask;
@@ -84,6 +91,21 @@ import java.util.stream.Collectors;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+import com.google.ar.core.Anchor;
+import com.google.ar.core.ArCoreApk;
+import com.google.ar.core.Camera;
+import com.google.ar.core.Config;
+import com.google.ar.core.Frame;
+import com.google.ar.core.HitResult;
+import com.google.ar.core.Plane;
+import com.google.ar.core.Point.OrientationMode;
+import com.google.ar.core.PointCloud;
+import com.google.ar.core.Session;
+import com.google.ar.core.SharedCamera;
+import com.google.ar.core.Trackable;
+import com.google.ar.core.TrackingState;
+import com.google.ar.core.exceptions.CameraNotAvailableException;
+import com.google.ar.core.exceptions.UnavailableException;
 
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
@@ -91,29 +113,13 @@ import org.json.JSONObject;
 public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
-    private String lastTimeStamp;
     private PeriodCalculator periodCalculator;
-
-    public String getLastVideoPath() {
-        return lastVideoPath;
-    }
-
-    public void deleteUnusedVideo() {
-        String videoPath = getLastVideoPath();
-        File videoFile = new File(videoPath);
-        boolean result = videoFile.delete();
-        if (!result) {
-            Log.d(TAG, "Video file could not be deleted");
-        }
-    }
-
-    private String lastVideoPath;
-
-    public Integer getLastVideoSeqId() {
-        return lastVideoSeqId;
-    }
-
-    private Integer lastVideoSeqId;
+    // ARCore session that supports camera sharing.
+    private Session sharedSession;
+    // ARCore shared camera instance, obtained from ARCore session that supports sharing.
+    private SharedCamera sharedCamera;
+    private CaptureRequest.Builder previewCaptureRequestBuilder;
+    private ImageReader yuvReader;
 
     public int getCurSequence() {
         return curSequence;
@@ -131,7 +137,6 @@ public class MainActivity extends Activity {
 
     private int curSequence;
 
-    private static final String SUBDIR_NAME = "RecSync";
 
     private boolean permissionsGranted = false;
 
@@ -183,6 +188,8 @@ public class MainActivity extends Activity {
     private CameraController cameraController;
     private CameraCaptureSession captureSession;
 
+    private VideoHelpers videoHelpers;
+
     /**
      * Manages SoftwareSync setup/teardown. Since softwaresync should only run when the camera is
      * running, it is instantiated in openCamera() and closed inside closeCamera().
@@ -218,16 +225,19 @@ public class MainActivity extends Activity {
     private Surface surface;
 
 
+    public Integer getLastVideoSeqId() {
+        return videoHelpers.lastVideoSeqId;
+    }
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         Log.v(TAG, "onCreate");
         periodCalculator = new PeriodCalculator();
+        videoHelpers = new VideoHelpers();
         checkPermissions();
         if (permissionsGranted) {
             onCreateWithPermission();
-        } else {
-            // Wait for user to finish permissions before setting up the app.
         }
     }
 
@@ -246,7 +256,10 @@ public class MainActivity extends Activity {
             Toast.makeText(this, R.string.error_msg_cant_open_camera2, Toast.LENGTH_LONG).show();
             Log.e(TAG, String.valueOf(R.string.error_msg_cant_open_camera2));
             finish();
-        }
+        } catch (UnavailableApkTooOldException | UnavailableDeviceNotCompatibleException | UnavailableSdkTooOldException | UnavailableArcoreNotInstalledException e) {
+            e.printStackTrace();
+        } // TODO: proper check for arcore
+
 
         // Set the aspect ratio now that we know the viewfinder resolution.
         surfaceView.setAspectRatio(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
@@ -358,32 +371,87 @@ public class MainActivity extends Activity {
 
     @SuppressLint("MissingPermission")
     private void openCamera() {
+        Log.d(TAG, "resumeCamera");
+        yuvReader = ImageReader.newInstance(
+                yuvImageResolution.getWidth(),
+                yuvImageResolution.getHeight(),
+                ImageFormat.YUV_420_888,
+                1);
+        StateCallback cameraStateCallback =
+                new StateCallback() {
+                    @Override
+                    public void onOpened(CameraDevice openedCameraDevice) {
+                        cameraDevice = openedCameraDevice;
+                        startSoftwareSync();
+                        initCameraController();
+                        configureCaptureSession(); // calls startPreview();
+                    }
+
+                    @Override
+                    public void onDisconnected(CameraDevice cameraDevice) {
+
+                    }
+
+                    @Override
+                    public void onError(CameraDevice cameraDevice, int i) {
+                    }
+
+
+                };
+
+        // Make sure that ARCore is installed, up to date, and supported on this device.
+        if (!isARCoreSupportedAndUpToDate()) {
+            return;
+        }
+
+        if (sharedSession == null) {
+            try {
+                // Create ARCore session that supports camera sharing.
+                sharedSession = new Session(this, EnumSet.of(Session.Feature.SHARED_CAMERA));
+            } catch (Exception e) {
+//                    errorCreatingSession = true;
+//                    messageSnackbarHelper.showError(
+//                            this, "Failed to create ARCore session that supports camera sharing");
+                Log.e(TAG, "Failed to create ARCore session that supports camera sharing", e);
+                return;
+            }
+
+//                errorCreatingSession = false;
+
+            // Enable auto focus mode while ARCore is running.
+            Config config = sharedSession.getConfig();
+            config.setFocusMode(Config.FocusMode.AUTO);
+            sharedSession.configure(config);
+        }
+
+        // Store the ARCore shared camera reference.
+        sharedCamera = sharedSession.getSharedCamera();
+
+        // Store the ID of the camera used by ARCore.
+        cameraId = sharedSession.getCameraConfig().getCameraId();
+        // TODO: configure app surfaces (maybe from CameraController?)
+        // When ARCore is running, make sure it also updates our CPU image surface.
+        List<Surface> surfaces = new ArrayList<>();
+        surfaces.add(yuvReader.getSurface());
+        surfaces.add(viewfinderSurface);
+        sharedCamera.setAppSurfaces(this.cameraId, surfaces);
+
         try {
-            Log.d(TAG, "resumeCamera");
 
-            StateCallback cameraStateCallback =
-                    new StateCallback() {
-                        @Override
-                        public void onOpened(CameraDevice openedCameraDevice) {
-                            cameraDevice = openedCameraDevice;
-                            startSoftwareSync();
-                            initCameraController();
-                            configureCaptureSession(); // calls startPreview();
-                        }
+            // Wrap our callback in a shared camera callback.
+            StateCallback wrappedCallback =
+                    sharedCamera.createARDeviceStateCallback(cameraStateCallback, cameraHandler);
 
-                        @Override
-                        public void onDisconnected(CameraDevice cameraDevice) {
-                        }
+            // Store a reference to the camera system service.
+            cameraManager = (CameraManager) this.getSystemService(Context.CAMERA_SERVICE);
 
-                        @Override
-                        public void onError(CameraDevice cameraDevice, int i) {
-                        }
-                    };
-            cameraManager.openCamera(cameraId, cameraStateCallback, cameraHandler); // Starts chain.
+            // Get the characteristics for the ARCore camera.
+            CameraCharacteristics characteristics = cameraManager.getCameraCharacteristics(this.cameraId);
 
-        } catch (CameraAccessException e) {
-            Log.e(TAG, "Cannot open camera!", e);
-            finish();
+            // Open the camera device using the ARCore wrapped callback.
+            cameraManager.openCamera(cameraId, wrappedCallback, cameraHandler);
+        } catch (CameraAccessException | IllegalArgumentException | SecurityException e) {
+            Log.e(TAG, "Failed to open camera", e);
         }
     }
 
@@ -447,31 +515,6 @@ public class MainActivity extends Activity {
                                             SoftwareSyncController.METHOD_START_RECORDING,
                                             "0");
                         }
-
-/*            if (cameraController.getOutputSurfaces().isEmpty()) {
-              Log.e(TAG, "No output surfaces found.");
-              Toast.makeText(this, R.string.error_msg_no_outputs, Toast.LENGTH_LONG).show();
-              return;
-            }
-
-            long currentTimestamp = softwareSyncController.softwareSync.getLeaderTimeNs();
-            // Trigger request some time in the future (~500ms for example) so all devices have time
-            // to receive the request (delayed due to network latency) and prepare for triggering.
-            // Note: If the user keeps a running circular buffer of images, they can select frames
-            // in the near past as well, allowing for 'instantaneous' captures on all devices.
-            long futureTimestamp = currentTimestamp + Constants.FUTURE_TRIGGER_DELAY_NS;
-
-            Log.d(
-                TAG,
-                String.format(
-                    "Trigger button, sending timestamp %,d at %,d",
-                    futureTimestamp, currentTimestamp));
-
-            // Broadcast desired synchronized capture time to all devices.
-            ((SoftwareSyncLeader) softwareSyncController.softwareSync)
-                .broadcastRpc(
-                    SoftwareSyncController.METHOD_SET_TRIGGER_TIME,
-                    String.valueOf(futureTimestamp));*/
                     });
 
             phaseAlignButton.setOnClickListener(
@@ -484,6 +527,7 @@ public class MainActivity extends Activity {
 
             exposureSeekBar.setOnSeekBarChangeListener(
                     new OnSeekBarChangeListener() {
+                        @SuppressLint("SetTextI18n")
                         @Override
                         public void onProgressChanged(SeekBar seekBar, int value, boolean fromUser) {
                             currentSensorExposureTimeNs = seekBarValueToExposureNs(value);
@@ -515,6 +559,7 @@ public class MainActivity extends Activity {
 
             sensitivitySeekBar.setOnSeekBarChangeListener(
                     new OnSeekBarChangeListener() {
+                        @SuppressLint("SetTextI18n")
                         @Override
                         public void onProgressChanged(SeekBar seekBar, int value, boolean fromUser) {
                             currentSensorSensitivity = seekBarValueToSensitivity(value);
@@ -595,7 +640,7 @@ public class MainActivity extends Activity {
     private void closeCamera() {
         stopPreview();
         captureSession = null;
-        surface.release();
+//        surface.release();
         if (cameraController != null) {
             cameraController.close();
             cameraController = null;
@@ -618,15 +663,16 @@ public class MainActivity extends Activity {
      * Gathers useful camera characteristics like available resolutions and cache them so we don't
      * have to query the CameraCharacteristics struct again.
      */
-    private void cacheCameraCharacteristics() throws CameraAccessException {
-        cameraId = null;
-        for (String id : cameraManager.getCameraIdList()) {
-            if (cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
-                    == Constants.DEFAULT_CAMERA_FACING) {
-                cameraId = id;
-                break;
-            }
-        }
+    private void cacheCameraCharacteristics() throws CameraAccessException, UnavailableSdkTooOldException, UnavailableDeviceNotCompatibleException, UnavailableArcoreNotInstalledException, UnavailableApkTooOldException {
+        // Create an ARCore session that supports camera sharing.
+        sharedSession = new Session(this, EnumSet.of(Session.Feature.SHARED_CAMERA));
+
+        // Store the ARCore shared camera reference.
+        sharedCamera = sharedSession.getSharedCamera();
+
+        // Store the ID of the camera that ARCore uses.
+        cameraId = sharedSession.getCameraConfig().getCameraId();
+
         cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
 
         StreamConfigurationMap scm =
@@ -644,20 +690,8 @@ public class MainActivity extends Activity {
         } else {
             throw new IllegalStateException("Viewfinder unavailable!");
         }
-        // TODO: max
         viewfinderResolution =
                 Collections.max(viewfinderOutputSizes, new CompareSizesByArea());
-
-        Size[] rawOutputSizes = scm.getOutputSizes(ImageFormat.RAW10);
-//    if (rawOutputSizes != null) {
-//      Log.i(TAG, "Available Bayer RAW resolutions:");
-//      for (Size s : rawOutputSizes) {
-//        Log.i(TAG, s.toString());
-//      }
-//    } else {
-//      Log.i(TAG, "Bayer RAW unavailable!");
-//    }
-//    rawImageResolution = Collections.max(Arrays.asList(rawOutputSizes), new CompareSizesByArea());
 
         CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
         List<Size> yuvOutputSizes = Arrays.stream(scm.getOutputSizes(ImageFormat.YUV_420_888)).filter(
@@ -671,30 +705,9 @@ public class MainActivity extends Activity {
         } else {
             Log.i(TAG, "YUV unavailable!");
         }
-        yuvImageResolution = Collections.max(yuvOutputSizes, new CompareSizesByArea());
+        yuvImageResolution = Collections.min(yuvOutputSizes, new CompareSizesByArea());
         Log.i(TAG, "Chosen viewfinder resolution: " + viewfinderResolution);
-//    Log.i(TAG, "Chosen raw resolution: " + rawImageResolution);
         Log.i(TAG, "Chosen yuv resolution: " + yuvImageResolution);
-    }
-
-    public void setUpcomingCaptureStill(long upcomingTriggerTimeNs) {
-        cameraController.setUpcomingCaptureStill(upcomingTriggerTimeNs);
-        double timeTillSec =
-                TimeUtils.nanosToSeconds(
-                        (double)
-                                (upcomingTriggerTimeNs - softwareSyncController.softwareSync.getLeaderTimeNs()));
-        runOnUiThread(
-                () -> {
-                    if (latestToast != null) {
-                        latestToast.cancel();
-                    }
-                    latestToast =
-                            Toast.makeText(
-                                    this,
-                                    String.format("Capturing in %.2f seconds", timeTillSec),
-                                    Toast.LENGTH_SHORT);
-                    latestToast.show();
-                });
     }
 
     public void notifyCapturing(String name) {
@@ -719,6 +732,10 @@ public class MainActivity extends Activity {
                     latestToast.show();
                     statusTextView.setText(String.format("%d captures", numCaptures));
                 });
+    }
+
+    public void deleteUnusedVideo() {
+        videoHelpers.deleteUnusedVideo();
     }
 
     /**
@@ -747,6 +764,190 @@ public class MainActivity extends Activity {
             throw new IllegalStateException("Camera capture failure during frame injection.", e);
         }
     }
+
+
+    /**
+     * Create {@link #cameraController}, and subscribe to status change events.
+     */
+    private void initCameraController() {
+        cameraController =
+                new CameraController(
+                        cameraCharacteristics,
+                        yuvReader,
+                        phaseAlignController,
+                        this,
+                        softwareSyncController.softwareSync);
+    }
+
+    private void configureCaptureSession() {
+        Log.d(TAG, "Creating capture session.");
+
+        List<Surface> outputSurfaces = new ArrayList<>();
+        Log.d(TAG, "Surfaceview size: " + surfaceView.getWidth() + ", " + surfaceView.getHeight());
+        Log.d(TAG, "viewfinderSurface valid? " + viewfinderSurface.isValid());
+        outputSurfaces.add(viewfinderSurface);
+
+        // MROB. Added MediaRecorder surface
+        try {
+            videoHelpers.createRecorderSurface(surface);
+            outputSurfaces.add(surface);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        outputSurfaces.addAll(cameraController.getOutputSurfaces());
+        if (cameraController.getOutputSurfaces().isEmpty()) {
+            Log.e(TAG, "No output surfaces found.");
+        }
+
+        Log.d(TAG, "Outputs " + cameraController.getOutputSurfaces());
+
+        try {
+            CameraCaptureSession.StateCallback sessionCallback =
+                    new CameraCaptureSession.StateCallback() {
+                        @Override
+                        public void onConfigured(CameraCaptureSession cameraCaptureSession) {
+                            Log.d(TAG, "camera capture configured.");
+                            captureSession = cameraCaptureSession;
+                            cameraController.configure(cameraDevice); // pass in device.
+                            startPreview();
+                        }
+
+                        @Override
+                        public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
+                            Log.d(TAG, "camera capture configure failed.");
+                        }
+                    };
+//            sharedSession.setCameraTextureName(backgroundRenderer.getTextureId());
+//            sharedCamera.getSurfaceTexture().setOnFrameAvailableListener(this);
+
+            // Create an ARCore compatible capture request using `TEMPLATE_RECORD`.
+            previewCaptureRequestBuilder =  cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+
+            // Build surfaces list, starting with ARCore provided surfaces.
+            List<Surface> surfaceList = sharedCamera.getArCoreSurfaces();
+
+            // Surface list should now contain three surfaces:
+            // 0. sharedCamera.getSurfaceTexture()
+            // 1. …
+            // 2. cpuImageReader.getSurface()
+
+            surfaceList.add(viewfinderSurface);
+//            surfaceList.add(yuvReader.getSurface());
+
+            // Add ARCore surfaces and CPU image surface targets.
+            for (Surface surface : surfaceList) {
+                previewCaptureRequestBuilder.addTarget(surface);
+            }
+
+            // Wrap our callback in a shared camera callback.
+            CameraCaptureSession.StateCallback wrappedCallback =
+                    sharedCamera.createARSessionStateCallback(sessionCallback, cameraHandler);
+
+            // Create camera capture session for camera preview using ARCore wrapped callback.
+            cameraDevice.createCaptureSession(surfaceList, wrappedCallback, cameraHandler);
+        } catch (CameraAccessException e) {
+            Log.e(TAG, "Unable to reconfigure capture request", e);
+        }
+    }
+
+    private void startPreview(boolean wantAutoExp) {
+        Log.d(TAG, "Starting preview.");
+
+        try {
+//            CaptureRequest.Builder previewRequestBuilder =
+//                    cameraController
+//                            .getRequestFactory()
+//                            .makePreview(
+//                                    viewfinderSurface,
+//                                    cameraController.getOutputSurfaces(),
+//                                    currentSensorExposureTimeNs,
+//                                    currentSensorSensitivity, wantAutoExp);
+
+//            captureSession.stopRepeating();
+            captureSession.setRepeatingRequest(
+                    previewCaptureRequestBuilder.build(),
+                    cameraController.getSynchronizerCaptureCallback(),
+                    cameraHandler);
+
+        } catch (CameraAccessException e) {
+            Log.w(TAG, "Unable to create preview.");
+        }
+    }
+
+    private void startPreview() {
+        startPreview(false);
+    }
+
+    public void setVideoRecording(boolean videoRecording) {
+        isVideoRecording = videoRecording;
+    }
+
+    public boolean isVideoRecording() {
+        return isVideoRecording;
+    }
+
+    public void startVideo(boolean wantAutoExp) {
+        Log.d(TAG, "Starting video.");
+        Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
+
+        isVideoRecording = true;
+        try {
+            mediaRecorder = videoHelpers.setUpMediaRecorder(surface);
+            String filename = videoHelpers.lastTimeStamp + ".csv";
+            // Creates frame timestamps logger
+            try {
+                mLogger = new CSVLogger(VideoHelpers.SUBDIR_NAME, filename, this);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            mediaRecorder.prepare();
+            Log.d(TAG, "MediaRecorder surface " + surface);
+            CaptureRequest.Builder previewRequestBuilder =
+                    cameraController
+                            .getRequestFactory()
+                            .makeVideo(
+                                    surface,
+                                    viewfinderSurface,
+                                    cameraController.getOutputSurfaces(),
+                                    currentSensorExposureTimeNs,
+                                    currentSensorSensitivity,
+                                    wantAutoExp);
+
+            captureSession.stopRepeating();
+
+            mediaRecorder.start();
+            videoHelpers.lastVideoSeqId = captureSession.setRepeatingRequest(
+                    previewRequestBuilder.build(),
+                    cameraController.getSynchronizerCaptureCallback(),
+                    cameraHandler);
+        } catch (CameraAccessException e) {
+            Log.w(TAG, "Unable to create video request.");
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stopVideo() {
+        // Switch to preview again
+
+        Toast.makeText(this, "Stopped recording video", Toast.LENGTH_LONG).show();
+        startPreview();
+    }
+
+    private void stopPreview() {
+        Log.d(TAG, "Stopping preview.");
+        if (captureSession == null) {
+            return;
+        }
+        try {
+            captureSession.stopRepeating();
+            Log.d(TAG, "Done: session is now ready.");
+        } catch (CameraAccessException e) {
+            Log.d(TAG, "Could not stop repeating.");
+        }
+    }
+
+    //!-------------END OF CAMERA2-RELATED STUFF
 
     private void createUi() {
         Window appWindow = getWindow();
@@ -844,232 +1045,6 @@ public class MainActivity extends Activity {
         }
     }
 
-    /**
-     * Create {@link #cameraController}, and subscribe to status change events.
-     */
-    private void initCameraController() {
-        cameraController =
-                new CameraController(
-                        cameraCharacteristics,
-                        Constants.SAVE_RAW ? rawImageResolution : null,
-                        Constants.SAVE_YUV ? yuvImageResolution : null,
-                        phaseAlignController,
-                        this,
-                        softwareSyncController.softwareSync);
-    }
-
-    private void configureCaptureSession() {
-        Log.d(TAG, "Creating capture session.");
-
-        List<Surface> outputSurfaces = new ArrayList<>();
-        Log.d(TAG, "Surfaceview size: " + surfaceView.getWidth() + ", " + surfaceView.getHeight());
-        Log.d(TAG, "viewfinderSurface valid? " + viewfinderSurface.isValid());
-        outputSurfaces.add(viewfinderSurface);
-
-        // MROB. Added MediaRecorder surface
-        try {
-            createRecorderSurface();
-            outputSurfaces.add(surface);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        outputSurfaces.addAll(cameraController.getOutputSurfaces());
-        if (cameraController.getOutputSurfaces().isEmpty()) {
-            Log.e(TAG, "No output surfaces found.");
-        }
-
-        Log.d(TAG, "Outputs " + cameraController.getOutputSurfaces());
-
-        try {
-            CameraCaptureSession.StateCallback sessionCallback =
-                    new CameraCaptureSession.StateCallback() {
-                        @Override
-                        public void onConfigured(CameraCaptureSession cameraCaptureSession) {
-                            Log.d(TAG, "camera capture configured.");
-                            captureSession = cameraCaptureSession;
-                            cameraController.configure(cameraDevice); // pass in device.
-                            startPreview();
-                        }
-
-                        @Override
-                        public void onConfigureFailed(CameraCaptureSession cameraCaptureSession) {
-                            Log.d(TAG, "camera capture configure failed.");
-                        }
-                    };
-            cameraDevice.createCaptureSession(outputSurfaces, sessionCallback, cameraHandler);
-        } catch (CameraAccessException e) {
-            Log.e(TAG, "Unable to reconfigure capture request", e);
-        }
-    }
-
-    private void startPreview(boolean wantAutoExp) {
-        Log.d(TAG, "Starting preview.");
-
-        try {
-            CaptureRequest.Builder previewRequestBuilder =
-                    cameraController
-                            .getRequestFactory()
-                            .makePreview(
-                                    viewfinderSurface,
-                                    cameraController.getOutputSurfaces(),
-                                    currentSensorExposureTimeNs,
-                                    currentSensorSensitivity, wantAutoExp);
-
-            captureSession.stopRepeating();
-            captureSession.setRepeatingRequest(
-                    previewRequestBuilder.build(),
-                    cameraController.getSynchronizerCaptureCallback(),
-                    cameraHandler);
-
-        } catch (CameraAccessException e) {
-            Log.w(TAG, "Unable to create preview.");
-        }
-    }
-
-    private void startPreview() {
-        startPreview(false);
-    }
-
-    /**
-     * Create directory and return file
-     * returning video file
-     */
-    private String getOutputMediaFilePath() throws IOException {
-//    // External sdcard file location
-//    File mediaStorageDir = new File(Environment.getExternalStorageDirectory(),
-//            "MROB_VID");
-//    // Create storage directory if it does not exist
-//    if (!mediaStorageDir.exists()) {
-//      if (!mediaStorageDir.mkdirs()) {
-//        Log.d(TAG, "Oops! Failed create "
-//                + "MROB_VID" + " directory");
-//        return null;
-//      }
-//    }
-
-        File sdcard = Environment.getExternalStorageDirectory();
-
-        Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
-
-        lastTimeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
-                Locale.getDefault()).format(new Date());
-        String mediaFile;
-        mediaFile = dir.toString() + File.separator + "VID_" + lastTimeStamp + ".mp4";
-        return mediaFile;
-
-    }
-
-    private void createRecorderSurface() throws IOException {
-        surface = MediaCodec.createPersistentInputSurface();
-
-        MediaRecorder recorder = setUpMediaRecorder(surface, false);
-        recorder.prepare();
-        recorder.release();
-        deleteUnusedVideo();
-    }
-
-    private MediaRecorder setUpMediaRecorder(Surface surface) throws IOException {
-        return setUpMediaRecorder(surface, true);
-    }
-
-    private MediaRecorder setUpMediaRecorder(Surface surface, boolean specifyOutput) throws IOException {
-        MediaRecorder recorder = new MediaRecorder();
-        recorder.setVideoSource(MediaRecorder.VideoSource.SURFACE);
-        recorder.setOutputFormat(MediaRecorder.OutputFormat.MPEG_4);
-        /*
-         * create video output file
-         */
-        /*
-         * set output file in media recorder
-         */
-
-        lastVideoPath = getOutputMediaFilePath();
-        recorder.setOutputFile(lastVideoPath);
-
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
-        recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
-        recorder.setVideoEncodingBitRate(profile.videoBitRate);
-
-        recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
-//    int rotation = getWindowManager().getDefaultDisplay().getRotation();
-/*    switch (mSensorOrientation) {
-      case SENSOR_ORIENTATION_INVERSE_DEGREES:
-        mMediaRecorder.setOrientationHint(INVERSE_ORIENTATIONS.get(rotation));
-        break;
-    }*/
-        recorder.setInputSurface(surface);
-        return recorder;
-    }
-
-    public void setVideoRecording(boolean videoRecording) {
-        isVideoRecording = videoRecording;
-    }
-
-    public boolean isVideoRecording() {
-        return isVideoRecording;
-    }
-
-    public void startVideo(boolean wantAutoExp) {
-        Log.d(TAG, "Starting video.");
-        Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
-
-        isVideoRecording = true;
-        try {
-            mediaRecorder = setUpMediaRecorder(surface);
-            String filename = lastTimeStamp + ".csv";
-            // Creates frame timestamps logger
-            try {
-                mLogger = new CSVLogger(SUBDIR_NAME, filename, this);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            mediaRecorder.prepare();
-            Log.d(TAG, "MediaRecorder surface " + surface);
-            CaptureRequest.Builder previewRequestBuilder =
-                    cameraController
-                            .getRequestFactory()
-                            .makeVideo(
-                                    surface,
-                                    viewfinderSurface,
-                                    cameraController.getOutputSurfaces(),
-                                    currentSensorExposureTimeNs,
-                                    currentSensorSensitivity,
-                                    wantAutoExp);
-
-            captureSession.stopRepeating();
-
-            mediaRecorder.start();
-            lastVideoSeqId = captureSession.setRepeatingRequest(
-                    previewRequestBuilder.build(),
-                    cameraController.getSynchronizerCaptureCallback(),
-                    cameraHandler);
-        } catch (CameraAccessException e) {
-            Log.w(TAG, "Unable to create video request.");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-    }
-
-    public void stopVideo() {
-        // Switch to preview again
-
-        Toast.makeText(this, "Stopped recording video", Toast.LENGTH_LONG).show();
-        startPreview();
-    }
-
-    private void stopPreview() {
-        Log.d(TAG, "Stopping preview.");
-        if (captureSession == null) {
-            return;
-        }
-        try {
-            captureSession.stopRepeating();
-            Log.d(TAG, "Done: session is now ready.");
-        } catch (CameraAccessException e) {
-            Log.d(TAG, "Could not stop repeating.");
-        }
-    }
-
     private void checkPermissions() {
         List<String> requests = new ArrayList<>(3);
 
@@ -1127,5 +1102,58 @@ public class MainActivity extends Activity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+
+    private boolean isARCoreSupportedAndUpToDate() {
+        // Make sure ARCore is installed and supported on this device.
+        ArCoreApk.Availability availability = ArCoreApk.getInstance().checkAvailability(this);
+        switch (availability) {
+            case SUPPORTED_INSTALLED:
+                break;
+            case SUPPORTED_APK_TOO_OLD:
+            case SUPPORTED_NOT_INSTALLED:
+                try {
+                    // Request ARCore installation or update if needed.
+                    ArCoreApk.InstallStatus installStatus =
+                            ArCoreApk.getInstance().requestInstall(this, /*userRequestedInstall=*/ true);
+                    switch (installStatus) {
+                        case INSTALL_REQUESTED:
+                            Log.e(TAG, "ARCore installation requested.");
+                            return false;
+                        case INSTALLED:
+                            break;
+                    }
+                } catch (UnavailableException e) {
+                    Log.e(TAG, "ARCore not installed", e);
+                    runOnUiThread(
+                            () ->
+                                    Toast.makeText(
+                                            getApplicationContext(), "ARCore not installed\n" + e, Toast.LENGTH_LONG)
+                                            .show());
+                    finish();
+                    return false;
+                }
+                break;
+            case UNKNOWN_ERROR:
+            case UNKNOWN_CHECKING:
+            case UNKNOWN_TIMED_OUT:
+            case UNSUPPORTED_DEVICE_NOT_CAPABLE:
+                Log.e(
+                        TAG,
+                        "ARCore is not supported on this device, ArCoreApk.checkAvailability() returned "
+                                + availability);
+                runOnUiThread(
+                        () ->
+                                Toast.makeText(
+                                        getApplicationContext(),
+                                        "ARCore is not supported on this device, "
+                                                + "ArCoreApk.checkAvailability() returned "
+                                                + availability,
+                                        Toast.LENGTH_LONG)
+                                        .show());
+                return false;
+        }
+        return true;
     }
 }

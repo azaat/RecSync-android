@@ -87,8 +87,7 @@ public class CameraController {
   @SuppressLint("DefaultLocale")
   public CameraController(
           CameraCharacteristics cameraCharacteristics,
-          Size rawImageResolution,
-          Size yuvImageResolution,
+          ImageReader imageReader,
           PhaseAlignController phaseAlignController,
           MainActivity context,
           TimeDomainConverter timeDomainConverter
@@ -107,23 +106,8 @@ public class CameraController {
 
     imageReaders = new ArrayList<>();
     final int imageBuffer = 1;
-    if (rawImageResolution != null) {
-      imageReaders.add(
-              ImageReader.newInstance(
-                      rawImageResolution.getWidth(),
-                      rawImageResolution.getHeight(),
-                      ImageFormat.RAW10,
-                      imageBuffer));
-    }
-
-    if (yuvImageResolution != null) {
-      imageReaders.add(
-              ImageReader.newInstance(
-                      yuvImageResolution.getWidth(),
-                      yuvImageResolution.getHeight(),
-                      ImageFormat.YUV_420_888,
-                      imageBuffer));
-    }
+    imageReaders.add(
+            imageReader);
 
     imageMetadataSynchronizer = new ImageMetadataSynchronizer(imageReaders, imageHandler, context);
     imageMetadataSynchronizer.registerCallback(

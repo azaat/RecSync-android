@@ -57,7 +57,7 @@ public class CaptureRequestFactory {
           boolean wantAutoExp)
           throws CameraAccessException {
 
-    CaptureRequest.Builder builder = device.createCaptureRequest(TEMPLATE_PREVIEW);
+    CaptureRequest.Builder builder = device.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
     if (wantAutoExp) {
       builder.set(CONTROL_AE_MODE, CONTROL_AWB_MODE_AUTO);
 
@@ -74,15 +74,15 @@ public class CaptureRequestFactory {
     // Auto focus is used since different devices may have different manual focus values.
     builder.set(CONTROL_AF_MODE, CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
-    if (viewfinderSurface != null) {
-      builder.addTarget(viewfinderSurface);
-    }
-    List<Integer> targetIndices = new ArrayList<>();
-    for (int i = 0; i < imageSurfaces.size(); i++) {
-      builder.addTarget(imageSurfaces.get(i));
-      targetIndices.add(i);
-    }
-    builder.setTag(new CaptureRequestTag(targetIndices, null));
+//    if (viewfinderSurface != null) {
+//      builder.addTarget(viewfinderSurface);
+//    }
+//    List<Integer> targetIndices = new ArrayList<>();
+//    for (int i = 0; i < imageSurfaces.size(); i++) {
+//      builder.addTarget(imageSurfaces.get(i));
+//      targetIndices.add(i);
+//    }
+//    builder.setTag(new CaptureRequestTag(targetIndices, null));
     return builder;
   }
 

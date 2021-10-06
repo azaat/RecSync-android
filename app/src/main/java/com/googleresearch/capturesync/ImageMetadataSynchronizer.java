@@ -420,7 +420,7 @@ public class ImageMetadataSynchronizer {
     // TODO(jiawen): Add annotations.
     CaptureRequestTag crt = CaptureRequestTag.getCaptureRequestTag(result);
     if (crt == null) {
-      throw new IllegalArgumentException("CaptureResult is missing a CaptureRequestTag.");
+      return;
     }
 
     // It has no targets, doesn't affect the queue.

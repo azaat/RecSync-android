@@ -131,14 +131,14 @@ public class SoftwareSyncController implements Closeable {
 
         // Set up shared rpcs.
         Map<Integer, RpcCallback> sharedRpcs = new HashMap<>();
-        sharedRpcs.put(
-                METHOD_SET_TRIGGER_TIME,
-                payload -> {
-                    Log.v(TAG, "Setting next trigger to" + payload);
-                    upcomingTriggerTimeNs = Long.valueOf(payload);
-                    // TODO: (MROB) change to video
-                    context.setUpcomingCaptureStill(upcomingTriggerTimeNs);
-                });
+//        sharedRpcs.put(
+//                METHOD_SET_TRIGGER_TIME,
+//                payload -> {
+//                    Log.v(TAG, "Setting next trigger to" + payload);
+//                    upcomingTriggerTimeNs = Long.valueOf(payload);
+//                    // TODO: (MROB) change to video
+//                    context.setUpcomingCaptureStill(upcomingTriggerTimeNs);
+//                });
 
 
         sharedRpcs.put(
