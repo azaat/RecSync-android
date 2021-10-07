@@ -388,6 +388,7 @@ public class ImageMetadataSynchronizer {
             synchronized (ImageMetadataSynchronizer.this) {
               handleCaptureResultLocked(result);
             }
+            context.shouldUpdateSurfaceTexture.set(true);
           }
 
           @Override
