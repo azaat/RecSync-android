@@ -197,7 +197,6 @@ public class SoftwareSyncController implements Closeable {
                                 () -> context.startVideo(false)
                         );
                     });
-
             clientRpcs.put(
                     METHOD_STOP_RECORDING,
                     payload -> {

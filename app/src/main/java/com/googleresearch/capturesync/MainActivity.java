@@ -33,7 +33,9 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CameraDevice.StateCallback;
 import android.hardware.camera2.CameraManager;
+import android.hardware.camera2.CaptureFailure;
 import android.hardware.camera2.CaptureRequest;
+import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
 import android.media.ImageReader;
@@ -63,6 +65,8 @@ import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import androidx.annotation.NonNull;
 
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
@@ -314,6 +318,8 @@ public class MainActivity extends Activity
     private void onCreateWithPermission() {
         setContentView(R.layout.activity_main);
         send2aHandler = new Handler();
+        tapHelper = new TapHelper(this);
+
         displayRotationHelper = new DisplayRotationHelper(this);
 
         createUi();
@@ -446,7 +452,12 @@ public class MainActivity extends Activity
     }
 
     private void pauseARCore() {
-        // TODO: implement me
+        if (arcoreActive) {
+            // Pause ARCore.
+            sharedSession.pause();
+            isFirstFrameWithoutArcore.set(true);
+            arcoreActive = false;
+        }
     }
 
     private void startCameraThread() {
@@ -788,8 +799,6 @@ public class MainActivity extends Activity
         } else {
             throw new IllegalStateException("Viewfinder unavailable!");
         }
-        viewfinderResolution =
-                Collections.max(viewfinderOutputSizes, new CompareSizesByArea());
 
         CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
         List<Size> yuvOutputSizes = Arrays.stream(scm.getOutputSizes(ImageFormat.YUV_420_888)).filter(
@@ -803,7 +812,7 @@ public class MainActivity extends Activity
         } else {
             Log.i(TAG, "YUV unavailable!");
         }
-        yuvImageResolution = Collections.min(yuvOutputSizes, new CompareSizesByArea());
+        yuvImageResolution = Collections.max(yuvOutputSizes, new CompareSizesByArea());
         Log.i(TAG, "Chosen viewfinder resolution: " + viewfinderResolution);
         Log.i(TAG, "Chosen yuv resolution: " + yuvImageResolution);
     }
@@ -1079,6 +1088,48 @@ public class MainActivity extends Activity
         }
     }
 
+    public Handler getCameraHandler() {
+        return cameraHandler;
+    }
+
+
+    // Repeating camera capture session capture callback.
+    private final CameraCaptureSession.CaptureCallback cameraCaptureCallback =
+            new CameraCaptureSession.CaptureCallback() {
+
+                @Override
+                public void onCaptureCompleted(
+                        @NonNull CameraCaptureSession session,
+                        @NonNull CaptureRequest request,
+                        @NonNull TotalCaptureResult result) {
+                    shouldUpdateSurfaceTexture.set(true);
+                }
+
+                @Override
+                public void onCaptureBufferLost(
+                        @NonNull CameraCaptureSession session,
+                        @NonNull CaptureRequest request,
+                        @NonNull Surface target,
+                        long frameNumber) {
+                    Log.e(TAG, "onCaptureBufferLost: " + frameNumber);
+                }
+
+                @Override
+                public void onCaptureFailed(
+                        @NonNull CameraCaptureSession session,
+                        @NonNull CaptureRequest request,
+                        @NonNull CaptureFailure failure) {
+                    Log.e(TAG, "onCaptureFailed: " + failure.getFrameNumber() + " " + failure.getReason());
+                }
+
+                @Override
+                public void onCaptureSequenceAborted(
+                        @NonNull CameraCaptureSession session, int sequenceId) {
+                    Log.e(TAG, "onCaptureSequenceAborted: " + sequenceId + " " + session);
+                }
+            };
+
+
     public void injectFrame(long desiredExposureTimeNs) {
         try {
             CaptureRequest.Builder builder =
@@ -1087,7 +1138,7 @@ public class MainActivity extends Activity
                             .makeFrameInjectionRequest(
                                     desiredExposureTimeNs, cameraController.getOutputSurfaces());
             captureSession.capture(
-                    builder.build(), cameraController.getSynchronizerCaptureCallback(), cameraHandler);
+                    builder.build(), cameraCaptureCallback, cameraHandler);
         } catch (CameraAccessException e) {
             throw new IllegalStateException("Camera capture failure during frame injection.", e);
         }
@@ -1134,10 +1185,23 @@ public class MainActivity extends Activity
                     new CameraCaptureSession.StateCallback() {
                         @Override
                         public void onConfigured(CameraCaptureSession cameraCaptureSession) {
-                            Log.d(TAG, "camera capture configured.");
+                            Log.d(TAG, "Camera capture session configured.");
                             captureSession = cameraCaptureSession;
-                            cameraController.configure(cameraDevice); // pass in device.
-                            startPreview();
+                            if (arMode) {
+                                startPreview();
+                                // Note, resumeARCore() must be called in onActive(), not here.
+                            } else {
+                                // Calls `setRepeatingCaptureRequest()`.
+                                resumeCamera2();
+                            }
+                        }
+
+                        @Override
+                        public void onActive(@NonNull CameraCaptureSession session) {
+                            Log.d(TAG, "Camera capture session active.");
+                            if (arMode && !arcoreActive) {
+                                resumeARCore();
+                            }
                         }
 
                         @Override
@@ -1196,7 +1260,7 @@ public class MainActivity extends Activity
 //            captureSession.stopRepeating();
             captureSession.setRepeatingRequest(
                     previewCaptureRequestBuilder.build(),
-                    cameraController.getSynchronizerCaptureCallback(),
+                    cameraCaptureCallback,
                     cameraHandler);
 
         } catch (CameraAccessException e) {
@@ -1220,48 +1284,80 @@ public class MainActivity extends Activity
         Log.d(TAG, "Starting video.");
         Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
 
-        isVideoRecording = true;
-        try {
-            mediaRecorder = videoHelpers.setUpMediaRecorder(surface);
-            String filename = videoHelpers.lastTimeStamp + ".csv";
-            // Creates frame timestamps logger
-            try {
-                mLogger = new CSVLogger(VideoHelpers.SUBDIR_NAME, filename, this);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-            mediaRecorder.prepare();
-            Log.d(TAG, "MediaRecorder surface " + surface);
-//            CaptureRequest.Builder previewRequestBuilder =
-//                    cameraController
-//                            .getRequestFactory()
-//                            .makeVideo(
-//                                    surface,
-//                                    viewfinderSurface,
-//                                    cameraController.getOutputSurfaces(),
-//                                    currentSensorExposureTimeNs,
-//                                    currentSensorSensitivity,
-//                                    wantAutoExp);
+//        isVideoRecording = true;
+        arMode = true;
+        resumeARCore();
+//        try {
+//            mediaRecorder = videoHelpers.setUpMediaRecorder(surface);
+//            String filename = videoHelpers.lastTimeStamp + ".csv";
+//            // Creates frame timestamps logger
+//            try {
+//                mLogger = new CSVLogger(VideoHelpers.SUBDIR_NAME, filename, this);
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
+//            mediaRecorder.prepare();
+//            Log.d(TAG, "MediaRecorder surface " + surface);
+////            CaptureRequest.Builder previewRequestBuilder =
+////                    cameraController
+////                            .getRequestFactory()
+////                            .makeVideo(
+////                                    surface,
+////                                    viewfinderSurface,
+////                                    cameraController.getOutputSurfaces(),
+////                                    currentSensorExposureTimeNs,
+////                                    currentSensorSensitivity,
+////                                    wantAutoExp);
+//
+//            captureSession.stopRepeating();
+//
+////            mediaRecorder.start();
+////            videoHelpers.lastVideoSeqId = captureSession.setRepeatingRequest(
+////                    previewRequestBuilder.build(),
+////                    cameraController.getSynchronizerCaptureCallback(),
+////                    cameraHandler);
+//        } catch (CameraAccessException e) {
+//            Log.w(TAG, "Unable to create video request.");
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//        }
 
-            captureSession.stopRepeating();
-
-//            mediaRecorder.start();
-//            videoHelpers.lastVideoSeqId = captureSession.setRepeatingRequest(
-//                    previewRequestBuilder.build(),
-//                    cameraController.getSynchronizerCaptureCallback(),
-//                    cameraHandler);
-        } catch (CameraAccessException e) {
-            Log.w(TAG, "Unable to create video request.");
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
     }
 
     public void stopVideo() {
         // Switch to preview again
+        arMode = false;
+        pauseARCore();
+        resumeCamera2();
+    }
 
-        Toast.makeText(this, "Stopped recording video", Toast.LENGTH_LONG).show();
+    private void resumeCamera2() {
         startPreview();
+        sharedCamera.getSurfaceTexture().setOnFrameAvailableListener(this);
+    }
+
+    private void resumeARCore() {
+        if (sharedSession == null) {
+            return;
+        }
+
+        if (!arcoreActive) {
+            try {
+                // To avoid flicker when resuming ARCore mode inform the renderer to not suppress rendering
+                // of the frames with zero timestamp.
+                backgroundRenderer.suppressTimestampZeroRendering(false);
+                // Resume ARCore.
+                sharedSession.resume();
+                arcoreActive = true;
+
+                // Set capture session callback while in AR mode.
+                sharedCamera.setCaptureCallback(cameraCaptureCallback,
+                        cameraHandler);
+            } catch (CameraNotAvailableException e) {
+                Log.e(TAG, "Failed to resume ARCore session", e);
+                return;
+            }
+        }
     }
 
     private void stopPreview() {
