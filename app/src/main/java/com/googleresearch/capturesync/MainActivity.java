@@ -17,6 +17,9 @@
 
 package com.googleresearch.capturesync;
 
+import static android.os.Environment.DIRECTORY_DOCUMENTS;
+import static android.os.Environment.DIRECTORY_PICTURES;
+
 import android.Manifest.permission;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -38,6 +41,7 @@ import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.TotalCaptureResult;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
+import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaCodec;
 import android.media.MediaRecorder;
@@ -68,6 +72,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
 import com.google.ar.core.exceptions.UnavailableDeviceNotCompatibleException;
@@ -85,9 +90,17 @@ import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
 import com.googleresearch.capturesync.softwaresync.phasealign.PhaseConfig;
 import com.googleresearch.capturesync.VideoHelpers;
+
+import java.io.BufferedWriter;
 import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.nio.channels.FileChannel;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -101,12 +114,16 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.FutureTask;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.stream.Collectors;
 
 import org.json.JSONException;
 import org.json.JSONObject;
+
 import com.google.ar.core.Anchor;
 import com.google.ar.core.ArCoreApk;
 import com.google.ar.core.Camera;
@@ -132,7 +149,7 @@ import javax.microedition.khronos.opengles.GL10;
  */
 public class MainActivity extends Activity
         implements GLSurfaceView.Renderer,
-        SurfaceTexture.OnFrameAvailableListener  {
+        SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
     private PeriodCalculator periodCalculator;
@@ -142,6 +159,8 @@ public class MainActivity extends Activity
     private SharedCamera sharedCamera;
     private CaptureRequest.Builder previewCaptureRequestBuilder;
     private ImageReader yuvReader;
+    private ExecutorService saver;
+    private View recButton;
 
     public int getCurSequence() {
         return curSequence;
@@ -184,7 +203,7 @@ public class MainActivity extends Activity
     private final PointCloudRenderer pointCloudRenderer = new PointCloudRenderer();
     // Temporary matrix allocated here to reduce number of allocations for each frame.
     private final float[] anchorMatrix = new float[16];
-    private static final float[] DEFAULT_COLOR = new float[] {0f, 0f, 0f, 0f};
+    private static final float[] DEFAULT_COLOR = new float[]{0f, 0f, 0f, 0f};
 
     // Anchors created from taps, see hello_ar_java sample to learn more.
     private final ArrayList<ColoredAnchor> anchors = new ArrayList<>();
@@ -254,29 +273,6 @@ public class MainActivity extends Activity
      */
     private SoftwareSyncController softwareSyncController;
 
-//    private AutoFitSurfaceView surfaceView;
-
-//    private final SurfaceHolder.Callback surfaceCallback =
-//            new SurfaceHolder.Callback() {
-//
-//                @Override
-//                public void surfaceCreated(SurfaceHolder holder) {
-//                    Log.i(TAG, "Surface created.");
-//                }
-//
-//                @Override
-//                public void surfaceChanged(SurfaceHolder holder, int format, int width, int height) {
-//                    Log.i(TAG, "Surface changed.");
-//                    viewfinderSurface = holder.getSurface();
-//                    openCamera();
-//                }
-//
-//                @Override
-//                public void surfaceDestroyed(SurfaceHolder holder) {
-//                    Log.i(TAG, "destroyed.");
-//                }
-//            };
-//    private Surface viewfinderSurface;
     private PhaseAlignController phaseAlignController;
     private int numCaptures;
     private Toast latestToast;
@@ -321,30 +317,10 @@ public class MainActivity extends Activity
         tapHelper = new TapHelper(this);
 
         displayRotationHelper = new DisplayRotationHelper(this);
-
         createUi();
         setupPhaseAlignController();
         arMode = false;
-        //TODO: implement check
-        // Query for camera characteristics and cache them.
-        try {
-            cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
-            cacheCameraCharacteristics();
-        } catch (CameraAccessException e) {
-            Toast.makeText(this, R.string.error_msg_cant_open_camera2, Toast.LENGTH_LONG).show();
-            Log.e(TAG, String.valueOf(R.string.error_msg_cant_open_camera2));
-            finish();
-        } catch (UnavailableApkTooOldException | UnavailableDeviceNotCompatibleException | UnavailableSdkTooOldException | UnavailableArcoreNotInstalledException e) {
-            e.printStackTrace();
-        } // TODO: proper check for arcore
-//
-//
-//        // Set the aspect ratio now that we know the viewfinder resolution.
-//        surfaceView.setAspectRatio(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
 
-        // Process the initial configuration (for i.e. initial orientation)
-        // We need this because #onConfigurationChanged doesn't get called when
-        // the app launches
 
         // GL surface view that renders camera preview image.
         surfaceView = findViewById(R.id.glsurfaceview);
@@ -389,45 +365,35 @@ public class MainActivity extends Activity
      * Resize the SurfaceView to be centered on screen.
      */
     private void updateViewfinderLayoutParams() {
-//        FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) surfaceView.getLayoutParams();
-
         // displaySize is set by the OS: it's how big the display is.
         Point displaySize = new Point();
         getWindowManager().getDefaultDisplay().getRealSize(displaySize);
         Log.i(TAG, String.format("display resized, now %d x %d", displaySize.x, displaySize.y));
 
-//        // Fit an image inside a rectangle maximizing the resulting area and centering (coordinates are
-//        // rounded down).
-//        params.width =
-//                Math.min(
-//                        displaySize.x,
-//                        displaySize.y * viewfinderResolution.getWidth() / viewfinderResolution.getHeight());
-//        params.height =
-//                Math.min(
-//                        displaySize.x * viewfinderResolution.getHeight() / viewfinderResolution.getWidth(),
-//                        displaySize.y);
-//        params.gravity = Gravity.CENTER;
-//
-//        surfaceView.setLayoutParams(params);
     }
 
     @Override
     public void onResume() {
         Log.d(TAG, "onResume");
+        saver = Executors.newSingleThreadExecutor();
+
         super.onResume(); // Required.
         surfaceView.onResume();
         if (surfaceCreated) {
             openCamera();
+            try {
+                cameraManager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
+                cacheCameraCharacteristics();
+            } catch (CameraAccessException e) {
+                Toast.makeText(this, R.string.error_msg_cant_open_camera2, Toast.LENGTH_LONG).show();
+                Log.e(TAG, String.valueOf(R.string.error_msg_cant_open_camera2));
+                finish();
+            } catch (UnavailableApkTooOldException | UnavailableDeviceNotCompatibleException | UnavailableSdkTooOldException | UnavailableArcoreNotInstalledException e) {
+                e.printStackTrace();
+            }
         }
+
         displayRotationHelper.onResume();
-
-//        surfaceView
-//                .getHolder()
-//                .setFixedSize(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
-//        surfaceView.getHolder().addCallback(surfaceCallback);
-//        Log.d(TAG, "Surfaceview size: " + surfaceView.getWidth() + ", " + surfaceView.getHeight());
-//        surfaceView.setVisibility(View.VISIBLE);
-
         startCameraThread();
     }
 
@@ -438,12 +404,8 @@ public class MainActivity extends Activity
         surfaceView.onPause();
         closeCamera();
         stopCameraThread();
-        displayRotationHelper.onResume();
-
-        // Make the SurfaceView GONE so that on resume, surfaceCreated() is called,
-//        // and on pause, surfaceDestroyed() is called.
-//        surfaceView.getHolder().removeCallback(surfaceCallback);
-//        surfaceView.setVisibility(View.GONE);
+        displayRotationHelper.onPause();
+        saver.shutdownNow();
 
         if (arMode) {
             pauseARCore();
@@ -480,11 +442,7 @@ public class MainActivity extends Activity
     @SuppressLint("MissingPermission")
     private void openCamera() {
         Log.d(TAG, "resumeCamera");
-        yuvReader = ImageReader.newInstance(
-                yuvImageResolution.getWidth(),
-                yuvImageResolution.getHeight(),
-                ImageFormat.YUV_420_888,
-                1);
+
         StateCallback cameraStateCallback =
                 new StateCallback() {
                     @Override
@@ -517,9 +475,6 @@ public class MainActivity extends Activity
                 // Create ARCore session that supports camera sharing.
                 sharedSession = new Session(this, EnumSet.of(Session.Feature.SHARED_CAMERA));
             } catch (Exception e) {
-//                    errorCreatingSession = true;
-//                    messageSnackbarHelper.showError(
-//                            this, "Failed to create ARCore session that supports camera sharing");
                 Log.e(TAG, "Failed to create ARCore session that supports camera sharing", e);
                 errorCreatingSession = true;
                 return;
@@ -530,6 +485,11 @@ public class MainActivity extends Activity
             // Enable auto focus mode while ARCore is running.
             Config config = sharedSession.getConfig();
             config.setFocusMode(Config.FocusMode.AUTO);
+
+            boolean isDepthSupported = sharedSession.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY);
+            Log.d("MROB", isDepthSupported + " depth");
+
+            config.setDepthMode(Config.DepthMode.RAW_DEPTH_ONLY);
             sharedSession.configure(config);
         }
 
@@ -538,15 +498,22 @@ public class MainActivity extends Activity
 
         // Store the ID of the camera used by ARCore.
         cameraId = sharedSession.getCameraConfig().getCameraId();
-        // TODO: configure app surfaces (maybe from CameraController?)
-        // When ARCore is running, make sure it also updates our CPU image surface.
+
+        Size desiredCpuImageSize = sharedSession.getCameraConfig().getImageSize();
+
+        yuvReader =
+                ImageReader.newInstance(
+                        desiredCpuImageSize.getWidth(),
+                        desiredCpuImageSize.getHeight(),
+                        ImageFormat.YUV_420_888,
+                        2
+                );
+
         List<Surface> surfaces = new ArrayList<>();
         surfaces.add(yuvReader.getSurface());
-//        surfaces.add(viewfinderSurface);
         sharedCamera.setAppSurfaces(this.cameraId, surfaces);
 
         try {
-
             // Wrap our callback in a shared camera callback.
             StateCallback wrappedCallback =
                     sharedCamera.createARDeviceStateCallback(cameraStateCallback, cameraHandler);
@@ -607,6 +574,7 @@ public class MainActivity extends Activity
             getPeriodButton.setVisibility(View.VISIBLE);
             exposureSeekBar.setVisibility(View.VISIBLE);
             sensitivitySeekBar.setVisibility(View.VISIBLE);
+            recButton.setVisibility(View.VISIBLE);
 
             captureStillButton.setOnClickListener(
                     view -> {
@@ -697,10 +665,23 @@ public class MainActivity extends Activity
         } else {
             // Client. All controls invisible.
             captureStillButton.setVisibility(View.INVISIBLE);
+            recButton.setVisibility(View.VISIBLE);
             phaseAlignButton.setVisibility(View.INVISIBLE);
             getPeriodButton.setVisibility(View.VISIBLE);
             exposureSeekBar.setVisibility(View.INVISIBLE);
             sensitivitySeekBar.setVisibility(View.INVISIBLE);
+
+            recButton.setOnClickListener(
+                    view -> {
+                        if (isVideoRecording) {
+                            stopVideo();
+                            isVideoRecording = false;
+
+                        } else {
+                            startVideo(false);
+                            isVideoRecording = true;
+                        }
+                    });
 
             captureStillButton.setOnClickListener(null);
             phaseAlignButton.setOnClickListener(null);
@@ -775,46 +756,7 @@ public class MainActivity extends Activity
     private void cacheCameraCharacteristics() throws CameraAccessException, UnavailableSdkTooOldException, UnavailableDeviceNotCompatibleException, UnavailableArcoreNotInstalledException, UnavailableApkTooOldException {
         // Create an ARCore session that supports camera sharing.
         sharedSession = new Session(this, EnumSet.of(Session.Feature.SHARED_CAMERA));
-
-        // Store the ARCore shared camera reference.
-        sharedCamera = sharedSession.getSharedCamera();
-
-        // Store the ID of the camera that ARCore uses.
-        cameraId = sharedSession.getCameraConfig().getCameraId();
-
         cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
-
-        StreamConfigurationMap scm =
-                cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
-
-        // We always capture the viewfinder. Its resolution is special: it's set chosen in Constants.
-        List<Size> viewfinderOutputSizes = Arrays.stream(scm.getOutputSizes(SurfaceTexture.class)).filter(
-                size -> size.getHeight() <= 1920 && size.getWidth() <= 1080
-        ).collect(Collectors.toList());
-        if (viewfinderOutputSizes.size() != 0) {
-            Log.i(TAG, "Available viewfinder resolutions:");
-            for (Size s : viewfinderOutputSizes) {
-                Log.i(TAG, s.toString());
-            }
-        } else {
-            throw new IllegalStateException("Viewfinder unavailable!");
-        }
-
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
-        List<Size> yuvOutputSizes = Arrays.stream(scm.getOutputSizes(ImageFormat.YUV_420_888)).filter(
-                size -> size.getHeight() <= profile.videoFrameHeight && size.getWidth() <= profile.videoFrameWidth
-        ).collect(Collectors.toList());
-        if (yuvOutputSizes.size() != 0) {
-            Log.i(TAG, "Available YUV resolutions:");
-            for (Size s : yuvOutputSizes) {
-                Log.i(TAG, s.toString());
-            }
-        } else {
-            Log.i(TAG, "YUV unavailable!");
-        }
-        yuvImageResolution = Collections.max(yuvOutputSizes, new CompareSizesByArea());
-        Log.i(TAG, "Chosen viewfinder resolution: " + viewfinderResolution);
-        Log.i(TAG, "Chosen yuv resolution: " + yuvImageResolution);
     }
 
     public void notifyCapturing(String name) {
@@ -880,12 +822,6 @@ public class MainActivity extends Activity
         GLES20.glViewport(0, 0, width, height);
         displayRotationHelper.onSurfaceChanged(width, height);
 
-//        runOnUiThread(
-//                () -> {
-//                    // Adjust layout based on display orientation.
-//                    imageTextLinearLayout.setOrientation(
-//                            width > height ? LinearLayout.HORIZONTAL : LinearLayout.VERTICAL);
-//                });
     }
 
     // GL draw callback. Will be called each frame on the GL thread.
@@ -963,6 +899,7 @@ public class MainActivity extends Activity
         Frame frame = sharedSession.update();
         Camera camera = frame.getCamera();
 
+
         // Handle screen tap.
         handleTap(frame, camera);
 
@@ -996,6 +933,49 @@ public class MainActivity extends Activity
         try (PointCloud pointCloud = frame.acquirePointCloud()) {
             pointCloudRenderer.update(pointCloud);
             pointCloudRenderer.draw(viewmtx, projmtx);
+        }
+        // TODO: save depth frame with low fps?
+        long unsyncTimestamp = frame.getAndroidCameraTimestamp();
+        try {
+            Image depthImage = frame.acquireRawDepthImage();
+            Log.d("MROB", "Depth should be saved");
+
+            Image.Plane plane = depthImage.getPlanes()[0];
+            int width = depthImage.getWidth();
+            int height = depthImage.getHeight();
+            int format = depthImage.getFormat();
+
+            Log.d("MROB", "W " + width + " H " + height + " format " + format);
+
+            ByteBuffer buffer = plane.getBuffer().order(ByteOrder.nativeOrder());
+            byte[] data = new byte[buffer.remaining()];
+            buffer.get(data);
+
+            depthImage.close();
+            saver.submit(
+                    () -> {
+                        Log.d("MROB", "Saving depth");
+                        File sdcard = Environment.getExternalStorageDirectory();
+                        try {
+                            Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), "MROB"));
+                            File file = new File(dir.toFile(), unsyncTimestamp + ".txt");
+                            FileOutputStream fos = new FileOutputStream(file);
+                            fos.write(data);
+                            fos.close();
+                        } catch (IOException e) {
+                            Log.d("MROB", "Couldn't save depth");
+
+                            e.printStackTrace();
+                        }
+
+                    }
+            );
+        } catch (NotYetAvailableException e) {
+            if (!(camera.getTrackingState() == TrackingState.TRACKING)) {
+                Log.d("MROB", "Not tracking");
+                Log.d("MROB", camera.getTrackingFailureReason().name());
+            }
+            boolean isDepthSupported = sharedSession.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY);
         }
 
 //        // If we detected any plane and snackbar is visible, then hide the snackbar.
@@ -1033,6 +1013,7 @@ public class MainActivity extends Activity
     // Handle only one tap per frame, as taps are usually low frequency compared to frame rate.
     private void handleTap(Frame frame, Camera camera) {
         MotionEvent tap = tapHelper.poll();
+
         if (tap != null && camera.getTrackingState() == TrackingState.TRACKING) {
             for (HitResult hit : frame.hitTest(tap)) {
                 // Check if any plane was hit, and if it was hit inside the plane polygon
@@ -1057,9 +1038,9 @@ public class MainActivity extends Activity
                     // for AR_TRACKABLE_PLANE, it's green color.
                     float[] objColor;
                     if (trackable instanceof com.google.ar.core.Point) {
-                        objColor = new float[] {66.0f, 133.0f, 244.0f, 255.0f};
+                        objColor = new float[]{66.0f, 133.0f, 244.0f, 255.0f};
                     } else if (trackable instanceof Plane) {
-                        objColor = new float[] {139.0f, 195.0f, 74.0f, 255.0f};
+                        objColor = new float[]{139.0f, 195.0f, 74.0f, 255.0f};
                     } else {
                         objColor = DEFAULT_COLOR;
                     }
@@ -1161,19 +1142,6 @@ public class MainActivity extends Activity
     private void configureCaptureSession() {
         Log.d(TAG, "Creating capture session.");
 
-        List<Surface> outputSurfaces = new ArrayList<>();
-//        Log.d(TAG, "Surfaceview size: " + surfaceView.getWidth() + ", " + surfaceView.getHeight());
-//        Log.d(TAG, "viewfinderSurface valid? " + viewfinderSurface.isValid());
-//        outputSurfaces.add(viewfinderSurface);
-
-        // MROB. Added MediaRecorder surface
-        try {
-            videoHelpers.createRecorderSurface(surface);
-            outputSurfaces.add(surface);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        outputSurfaces.addAll(cameraController.getOutputSurfaces());
         if (cameraController.getOutputSurfaces().isEmpty()) {
             Log.e(TAG, "No output surfaces found.");
         }
@@ -1214,17 +1182,11 @@ public class MainActivity extends Activity
             sharedSession.setCameraTextureName(backgroundRenderer.getTextureId());
             sharedCamera.getSurfaceTexture().setOnFrameAvailableListener(this);
             // Create an ARCore compatible capture request using `TEMPLATE_RECORD`.
-            previewCaptureRequestBuilder =  cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
+            previewCaptureRequestBuilder = cameraDevice.createCaptureRequest(CameraDevice.TEMPLATE_RECORD);
 
             // Build surfaces list, starting with ARCore provided surfaces.
             List<Surface> surfaceList = sharedCamera.getArCoreSurfaces();
 
-            // Surface list should now contain three surfaces:
-            // 0. sharedCamera.getSurfaceTexture()
-            // 1. …
-            // 2. cpuImageReader.getSurface()
-
-//            surfaceList.add(viewfinderSurface);
             surfaceList.add(yuvReader.getSurface());
 
             // Add ARCore surfaces and CPU image surface targets.
@@ -1232,7 +1194,7 @@ public class MainActivity extends Activity
                 previewCaptureRequestBuilder.addTarget(surface);
             }
 
-            previewCaptureRequestBuilder.setTag(new ImageMetadataSynchronizer.CaptureRequestTag(Collections.singletonList(0), null));
+//            previewCaptureRequestBuilder.setTag(new ImageMetadataSynchronizer.CaptureRequestTag(Collections.singletonList(0), null));
             // Wrap our callback in a shared camera callback.
             CameraCaptureSession.StateCallback wrappedCallback =
                     sharedCamera.createARSessionStateCallback(sessionCallback, cameraHandler);
@@ -1248,16 +1210,6 @@ public class MainActivity extends Activity
         Log.d(TAG, "Starting preview.");
 
         try {
-//            CaptureRequest.Builder previewRequestBuilder =
-//                    cameraController
-//                            .getRequestFactory()
-//                            .makePreview(
-//                                    viewfinderSurface,
-//                                    cameraController.getOutputSurfaces(),
-//                                    currentSensorExposureTimeNs,
-//                                    currentSensorSensitivity, wantAutoExp);
-
-//            captureSession.stopRepeating();
             captureSession.setRepeatingRequest(
                     previewCaptureRequestBuilder.build(),
                     cameraCaptureCallback,
@@ -1284,43 +1236,8 @@ public class MainActivity extends Activity
         Log.d(TAG, "Starting video.");
         Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
 
-//        isVideoRecording = true;
         arMode = true;
         resumeARCore();
-//        try {
-//            mediaRecorder = videoHelpers.setUpMediaRecorder(surface);
-//            String filename = videoHelpers.lastTimeStamp + ".csv";
-//            // Creates frame timestamps logger
-//            try {
-//                mLogger = new CSVLogger(VideoHelpers.SUBDIR_NAME, filename, this);
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-//            mediaRecorder.prepare();
-//            Log.d(TAG, "MediaRecorder surface " + surface);
-////            CaptureRequest.Builder previewRequestBuilder =
-////                    cameraController
-////                            .getRequestFactory()
-////                            .makeVideo(
-////                                    surface,
-////                                    viewfinderSurface,
-////                                    cameraController.getOutputSurfaces(),
-////                                    currentSensorExposureTimeNs,
-////                                    currentSensorSensitivity,
-////                                    wantAutoExp);
-//
-//            captureSession.stopRepeating();
-//
-////            mediaRecorder.start();
-////            videoHelpers.lastVideoSeqId = captureSession.setRepeatingRequest(
-////                    previewRequestBuilder.build(),
-////                    cameraController.getSynchronizerCaptureCallback(),
-////                    cameraHandler);
-//        } catch (CameraAccessException e) {
-//            Log.w(TAG, "Unable to create video request.");
-//        } catch (IOException e) {
-//            e.printStackTrace();
-//        }
 
     }
 
@@ -1394,6 +1311,7 @@ public class MainActivity extends Activity
 
         // Controls.
         captureStillButton = findViewById(R.id.capture_still_button);
+        recButton = findViewById(R.id.rec_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
 
@@ -1527,6 +1445,15 @@ public class MainActivity extends Activity
 
     @Override
     protected void onDestroy() {
+        if (sharedSession != null) {
+            // Explicitly close ARCore Session to release native resources.
+            // Review the API reference for important considerations before calling close() in apps with
+            // more complicated lifecycle requirements:
+            // https://developers.google.com/ar/reference/java/arcore/reference/com/google/ar/core/Session#close()
+            sharedSession.close();
+            sharedSession = null;
+        }
+
         super.onDestroy();
     }
 

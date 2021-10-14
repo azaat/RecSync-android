@@ -53,6 +53,12 @@
                 android:layout_height="wrap_content"
                 android:text="@string/action_capture_still"/>
 
+            <Button
+                android:id="@+id/rec_button"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/action_capture_still"/>
+
             <TextView
                 android:id="@+id/softwaresync_text"
                 android:layout_width="match_parent"

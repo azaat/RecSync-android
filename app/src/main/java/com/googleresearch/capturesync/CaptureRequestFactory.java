@@ -32,7 +32,7 @@ import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CaptureRequest;
 import android.view.Surface;
-import com.googleresearch.capturesync.ImageMetadataSynchronizer.CaptureRequestTag;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -122,7 +122,6 @@ public class CaptureRequestFactory {
       builder.addTarget(imageSurfaces.get(i));
       targetIndices.add(i);
     }
-    builder.setTag(new CaptureRequestTag(targetIndices, PhaseAlignController.INJECT_FRAME));
 
     return builder;
   }

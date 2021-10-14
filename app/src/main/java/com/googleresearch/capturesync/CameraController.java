@@ -17,31 +17,18 @@
 package com.googleresearch.capturesync;
 
 import android.annotation.SuppressLint;
-import android.graphics.ImageFormat;
-import android.hardware.camera2.CameraCaptureSession;
-import android.hardware.camera2.CameraCaptureSession.CaptureCallback;
 import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
-import android.hardware.camera2.CaptureFailure;
-import android.hardware.camera2.CaptureRequest;
-import android.hardware.camera2.CaptureResult;
-import android.hardware.camera2.TotalCaptureResult;
 import android.media.Image;
 import android.media.ImageReader;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
-import android.util.Size;
 import android.view.Surface;
 
-import androidx.annotation.NonNull;
-
-import com.googleresearch.capturesync.ImageMetadataSynchronizer.CaptureRequestTag;
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
-import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
@@ -67,7 +54,6 @@ public class CameraController implements ImageReader.OnImageAvailableListener {
 
 //  private final ImageMetadataSynchronizer imageMetadataSynchronizer;
 
-    private final ResultProcessor resultProcessor;
 //
 //  public CaptureCallback getSynchronizerCaptureCallback() {
 //    return .getCaptureCallback();
@@ -114,9 +100,6 @@ public class CameraController implements ImageReader.OnImageAvailableListener {
         syncThread.start();
         syncHandler = new Handler(syncThread.getLooper());
         this.context = context;
-        resultProcessor =
-                new ResultProcessor(
-                        timeDomainConverter, context, Constants.SAVE_JPG_FROM_YUV, Constants.JPG_QUALITY);
 
         imageReaders = new ArrayList<>();
         final int imageBuffer = 1;
