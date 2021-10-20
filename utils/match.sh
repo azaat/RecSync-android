@@ -1,3 +1,4 @@
+
 #!/bin/bash
 # Copyright 2021 Mobile Robotics Lab. at Skoltech
 #
@@ -12,8 +13,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-set -eo
 
 # Split two videos to frames
 ./extract.sh "$1" 1 
