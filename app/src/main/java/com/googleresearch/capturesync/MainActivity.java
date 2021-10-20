@@ -17,6 +17,13 @@
 
 package com.googleresearch.capturesync;
 
+import static android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF;
+import static android.hardware.camera2.CameraMetadata.CONTROL_MODE_AUTO;
+import static android.hardware.camera2.CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_OFF;
+import static android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE;
+import static android.hardware.camera2.CaptureRequest.CONTROL_MODE;
+import static android.hardware.camera2.CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE;
+import static android.hardware.camera2.CaptureRequest.SENSOR_EXPOSURE_TIME;
 import static android.os.Environment.DIRECTORY_DOCUMENTS;
 import static android.os.Environment.DIRECTORY_PICTURES;
 
@@ -1117,11 +1124,13 @@ public class MainActivity extends Activity
 
     public void injectFrame(long desiredExposureTimeNs) {
         try {
-            CaptureRequest.Builder builder =
-                    cameraController
-                            .getRequestFactory()
-                            .makeFrameInjectionRequest(
-                                    desiredExposureTimeNs, cameraController.getOutputSurfaces());
+            CaptureRequest.Builder builder = cameraDevice.createCaptureRequest(
+                                    CameraDevice.TEMPLATE_RECORD);
+            builder.set(CONTROL_MODE, CONTROL_MODE_AUTO);
+            builder.set(CONTROL_AE_MODE, CONTROL_AE_MODE_OFF);
+            builder.set(SENSOR_EXPOSURE_TIME, desiredExposureTimeNs);
+
+            builder.addTarget(yuvReader.getSurface());
             captureSession.capture(
                     builder.build(), cameraCaptureCallback, cameraHandler);
         } catch (CameraAccessException e) {
@@ -1197,7 +1206,7 @@ public class MainActivity extends Activity
             for (Surface surface : surfaceList) {
                 previewCaptureRequestBuilder.addTarget(surface);
             }
-
+            previewCaptureRequestBuilder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
 //            previewCaptureRequestBuilder.setTag(new ImageMetadataSynchronizer.CaptureRequestTag(Collections.singletonList(0), null));
             // Wrap our callback in a shared camera callback.
             CameraCaptureSession.StateCallback wrappedCallback =
