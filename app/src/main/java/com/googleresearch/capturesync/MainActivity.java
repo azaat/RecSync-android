@@ -987,7 +987,7 @@ public class MainActivity extends Activity {
         recorder.setOutputFile(lastVideoPath);
 
         CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
-        recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
+        recorder.setVideoSize(640, 480);
         recorder.setVideoEncodingBitRate(profile.videoBitRate);
 
         recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);

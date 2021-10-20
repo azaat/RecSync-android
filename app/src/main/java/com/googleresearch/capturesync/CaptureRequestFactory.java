@@ -20,11 +20,13 @@ import static android.hardware.camera2.CameraDevice.TEMPLATE_PREVIEW;
 import static android.hardware.camera2.CameraMetadata.CONTROL_AE_MODE_OFF;
 import static android.hardware.camera2.CameraMetadata.CONTROL_AWB_MODE_AUTO;
 import static android.hardware.camera2.CameraMetadata.CONTROL_MODE_AUTO;
+import static android.hardware.camera2.CameraMetadata.LENS_OPTICAL_STABILIZATION_MODE_OFF;
 import static android.hardware.camera2.CaptureRequest.CONTROL_AE_MODE;
 import static android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE;
 import static android.hardware.camera2.CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE;
 import static android.hardware.camera2.CaptureRequest.CONTROL_AWB_MODE;
 import static android.hardware.camera2.CaptureRequest.CONTROL_MODE;
+import static android.hardware.camera2.CaptureRequest.LENS_OPTICAL_STABILIZATION_MODE;
 import static android.hardware.camera2.CaptureRequest.SENSOR_EXPOSURE_TIME;
 import static android.hardware.camera2.CaptureRequest.SENSOR_SENSITIVITY;
 
@@ -67,9 +69,10 @@ public class CaptureRequestFactory {
       builder.set(SENSOR_EXPOSURE_TIME, sensorExposureTimeNs);
       builder.set(SENSOR_SENSITIVITY, sensorSensitivity);
     }
-
+    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1f);
     // Auto white balance used, these could be locked and sent from the leader instead.
     builder.set(CONTROL_AWB_MODE, CONTROL_AWB_MODE_AUTO);
+    builder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
 
     // Auto focus is used since different devices may have different manual focus values.
     builder.set(CONTROL_AF_MODE, CONTROL_AF_MODE_CONTINUOUS_PICTURE);
@@ -113,6 +116,9 @@ public class CaptureRequestFactory {
     builder.set(CONTROL_MODE, CONTROL_MODE_AUTO);
     builder.set(CONTROL_AE_MODE, CONTROL_AE_MODE_OFF);
     builder.set(SENSOR_EXPOSURE_TIME, desiredExposureTimeNs);
+    builder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
+    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1f);
+
     // TODO: Inserting frame duration directly would be more accurate than inserting exposure since
     // {@code frame duration ~ exposure + variable overhead}. However setting frame duration may not
     // be supported on many android devices, so we use exposure time here.
