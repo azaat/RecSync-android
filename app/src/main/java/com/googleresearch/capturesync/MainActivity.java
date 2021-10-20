@@ -20,6 +20,8 @@ package com.googleresearch.capturesync;
 import static android.os.Environment.DIRECTORY_DOCUMENTS;
 import static android.os.Environment.DIRECTORY_PICTURES;
 
+import static com.googleresearch.capturesync.VideoHelpers.SUBDIR_NAME;
+
 import android.Manifest.permission;
 import android.annotation.SuppressLint;
 import android.app.Activity;
@@ -45,6 +47,7 @@ import android.media.Image;
 import android.media.ImageReader;
 import android.media.MediaCodec;
 import android.media.MediaRecorder;
+import android.net.Uri;
 import android.net.wifi.WifiManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
@@ -72,6 +75,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
+import com.google.ar.core.RecordingConfig;
 import com.google.ar.core.exceptions.NotYetAvailableException;
 import com.google.ar.core.exceptions.UnavailableApkTooOldException;
 import com.google.ar.core.exceptions.UnavailableArcoreNotInstalledException;
@@ -161,6 +165,7 @@ public class MainActivity extends Activity
     private ImageReader yuvReader;
     private ExecutorService saver;
     private View recButton;
+    private String lastTimeStamp;
 
     public int getCurSequence() {
         return curSequence;
@@ -934,8 +939,16 @@ public class MainActivity extends Activity
             pointCloudRenderer.update(pointCloud);
             pointCloudRenderer.draw(viewmtx, projmtx);
         }
-        // TODO: save depth frame with low fps?
-        long unsyncTimestamp = frame.getAndroidCameraTimestamp();
+        long unSyncTimestampNs = frame.getAndroidCameraTimestamp();
+
+        long synchronizedTimestampNs =
+                this.softwareSyncController.softwareSync.leaderTimeForLocalTimeNs(
+                        unSyncTimestampNs);
+        try {
+            mLogger.logLine(String.valueOf(synchronizedTimestampNs));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
         try {
             Image depthImage = frame.acquireRawDepthImage();
             Log.d("MROB", "Depth should be saved");
@@ -957,8 +970,9 @@ public class MainActivity extends Activity
                         Log.d("MROB", "Saving depth");
                         File sdcard = Environment.getExternalStorageDirectory();
                         try {
-                            Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), "MROB"));
-                            File file = new File(dir.toFile(), unsyncTimestamp + ".txt");
+                            Path dir = Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME);
+                            File file = new File(dir.toFile(), synchronizedTimestampNs + ".txt");
+
                             FileOutputStream fos = new FileOutputStream(file);
                             fos.write(data);
                             fos.close();
@@ -967,7 +981,7 @@ public class MainActivity extends Activity
 
                             e.printStackTrace();
                         }
-
+                        // TODO: organize this mess with exceptions
                     }
             );
         } catch (NotYetAvailableException e) {
@@ -977,16 +991,6 @@ public class MainActivity extends Activity
             }
             boolean isDepthSupported = sharedSession.isDepthModeSupported(Config.DepthMode.RAW_DEPTH_ONLY);
         }
-
-//        // If we detected any plane and snackbar is visible, then hide the snackbar.
-//        if (messageSnackbarHelper.isShowing()) {
-//            for (Plane plane : sharedSession.getAllTrackables(Plane.class)) {
-//                if (plane.getTrackingState() == TrackingState.TRACKING) {
-//                    messageSnackbarHelper.hide(this);
-//                    break;
-//                }
-//            }
-//        }
 
         // Visualize planes.
         planeRenderer.drawPlanes(
@@ -1236,16 +1240,56 @@ public class MainActivity extends Activity
         Log.d(TAG, "Starting video.");
         Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
 
-        arMode = true;
-        resumeARCore();
+        try {
+            String path = getOutputMediaFilePath();
+            Uri destination = Uri.fromFile(new File(path));
+            RecordingConfig recordingConfig =
+                    new RecordingConfig(sharedSession)
+                            .setMp4DatasetUri(destination)
+                            .setAutoStopOnPause(true);
+
+            String filename = lastTimeStamp + ".csv";
+
+            // Creates frame timestamps logger
+            try {
+                mLogger = new CSVLogger(SUBDIR_NAME, filename, this);
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+            sharedSession.startRecording(recordingConfig);
+
+            arMode = true;
+            resumeARCore();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    /**
+     * Create directory and return file
+     * returning video file
+     */
+    private String getOutputMediaFilePath() throws IOException {
+        File sdcard = Environment.getExternalStorageDirectory();
+
+        Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
+
+        lastTimeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
+                Locale.getDefault()).format(new Date());
+        String mediaFile;
+        mediaFile = dir.toString() + File.separator + "VID_" + lastTimeStamp + ".mp4";
+        return mediaFile;
 
     }
+
 
     public void stopVideo() {
         // Switch to preview again
         arMode = false;
         pauseARCore();
         resumeCamera2();
+        mLogger.close();
     }
 
     private void resumeCamera2() {
