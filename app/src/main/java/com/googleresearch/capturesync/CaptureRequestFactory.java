@@ -58,7 +58,6 @@ public class CaptureRequestFactory {
           int sensorSensitivity,
           boolean wantAutoExp)
           throws CameraAccessException {
-
     CaptureRequest.Builder builder = device.createCaptureRequest(TEMPLATE_PREVIEW);
     if (wantAutoExp) {
       builder.set(CONTROL_AE_MODE, CONTROL_AWB_MODE_AUTO);
@@ -69,6 +68,9 @@ public class CaptureRequestFactory {
       builder.set(SENSOR_EXPOSURE_TIME, sensorExposureTimeNs);
       builder.set(SENSOR_SENSITIVITY, sensorSensitivity);
     }
+
+    builder.set(CaptureRequest.CONTROL_AF_MODE,
+            CONTROL_AE_MODE_OFF);
     builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1f);
     // Auto white balance used, these could be locked and sent from the leader instead.
     builder.set(CONTROL_AWB_MODE, CONTROL_AWB_MODE_AUTO);
@@ -85,6 +87,7 @@ public class CaptureRequestFactory {
       builder.addTarget(imageSurfaces.get(i));
       targetIndices.add(i);
     }
+
     builder.setTag(new CaptureRequestTag(targetIndices, null));
     return builder;
   }
@@ -114,6 +117,8 @@ public class CaptureRequestFactory {
           long desiredExposureTimeNs, List<Surface> imageSurfaces) throws CameraAccessException {
     CaptureRequest.Builder builder = device.createCaptureRequest(TEMPLATE_PREVIEW);
     builder.set(CONTROL_MODE, CONTROL_MODE_AUTO);
+    builder.set(CaptureRequest.CONTROL_AF_MODE,
+            CONTROL_AE_MODE_OFF);
     builder.set(CONTROL_AE_MODE, CONTROL_AE_MODE_OFF);
     builder.set(SENSOR_EXPOSURE_TIME, desiredExposureTimeNs);
     builder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
