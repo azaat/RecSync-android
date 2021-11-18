@@ -173,6 +173,7 @@ public class MainActivity extends Activity
     private ExecutorService saver;
     private View recButton;
     private String lastTimeStamp;
+    private VideoFrameInfo frameInfo;
 
     public int getCurSequence() {
         return curSequence;
@@ -388,7 +389,6 @@ public class MainActivity extends Activity
     public void onResume() {
         Log.d(TAG, "onResume");
         saver = Executors.newSingleThreadExecutor();
-
         super.onResume(); // Required.
         surfaceView.onResume();
         if (surfaceCreated) {
@@ -1247,6 +1247,7 @@ public class MainActivity extends Activity
 
     public void startVideo(boolean wantAutoExp) {
         Log.d(TAG, "Starting video.");
+
         Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
 
         try {
@@ -1257,6 +1258,7 @@ public class MainActivity extends Activity
                             .setMp4DatasetUri(destination)
                             .setAutoStopOnPause(true);
 
+            frameInfo = new VideoFrameInfo(lastTimeStamp, this, true);
             String filename = lastTimeStamp + ".csv";
 
             // Creates frame timestamps logger
@@ -1293,10 +1295,16 @@ public class MainActivity extends Activity
     }
 
 
+    public VideoFrameInfo getFrameInfo() {
+        return frameInfo;
+    }
+
     public void stopVideo() {
         // Switch to preview again
         arMode = false;
         pauseARCore();
+        frameInfo.close();
+        frameInfo = null;
         resumeCamera2();
         mLogger.close();
     }

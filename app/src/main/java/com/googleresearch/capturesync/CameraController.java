@@ -183,13 +183,17 @@ public class CameraController implements ImageReader.OnImageAvailableListener {
             Log.w(TAG, "onImageAvailable: Skipping null image.");
             return;
         }
+        VideoFrameInfo frameInfo = context.getFrameInfo();
 
         long unSyncTimestampNs = image.getTimestamp();
         context.onTimestampNs(unSyncTimestampNs);
         long synchronizedTimestampNs =
                 timeDomainConverter.leaderTimeForLocalTimeNs(
                         unSyncTimestampNs);
-
+        if (frameInfo != null) {
+            byte[] nv21 = YuvImageUtils.Yuv420ImageToNv21(image);
+            frameInfo.submitProcessFrame(synchronizedTimestampNs, nv21, image.getWidth(), image.getHeight());
+        }
         long phaseNs = phaseAlignController.updateCaptureTimestamp(synchronizedTimestampNs);
 
         image.close();
