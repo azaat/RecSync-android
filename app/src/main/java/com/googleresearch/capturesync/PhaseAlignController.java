@@ -73,6 +73,10 @@ public class PhaseAlignController {
     public long updateCaptureTimestamp(long timestampNs) {
         // TODO(samansaari) : Rename passTimestamp -> updateCaptureTimestamp or similar in softwaresync.
         latestResponse = phaseAligner.passTimestamp(timestampNs);
+        if (context.getVideoFrameInfo() != null) {
+            context.getVideoFrameInfo().submitProcessFrame(timestampNs);
+
+        }
         // TODO (samansari) : Pull this into an interface/callback.
         context.runOnUiThread(() -> context.updatePhaseTextView(latestResponse.diffFromGoalNs()));
         return latestResponse.phaseNs();

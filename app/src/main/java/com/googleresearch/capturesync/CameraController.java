@@ -150,6 +150,7 @@ public class CameraController {
 
               long phaseNs = phaseAlignController.updateCaptureTimestamp(synchronizedTimestampNs);
               double phaseMs = TimeUtils.nanosToMillis((double) phaseNs);
+
 //          Log.v(
 //              TAG,
 //              String.format(
@@ -164,6 +165,7 @@ public class CameraController {
                             synchronizedTimestampNs));
                   }
                 }
+
               } catch (IOException e) {
                 e.printStackTrace();
               }
