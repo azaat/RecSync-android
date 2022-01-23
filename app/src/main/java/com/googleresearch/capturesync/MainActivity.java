@@ -977,8 +977,9 @@ public class MainActivity extends Activity
                         Log.d("MROB", "Saving depth");
                         File sdcard = Environment.getExternalStorageDirectory();
                         try {
-                            Path dir = Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME);
-                            File file = new File(dir.toFile(), synchronizedTimestampNs + ".txt");
+                            File pdir = new File(sdcard.getAbsolutePath(), SUBDIR_NAME);
+                            File dir = new File(pdir, getLastTimeStamp());
+                            File file = new File(dir, synchronizedTimestampNs + ".txt");
 
                             FileOutputStream fos = new FileOutputStream(file);
                             fos.write(data);
@@ -1277,6 +1278,10 @@ public class MainActivity extends Activity
         }
     }
 
+    public String getLastTimeStamp() {
+        return lastTimeStamp;
+    }
+
     /**
      * Create directory and return file
      * returning video file
@@ -1285,9 +1290,10 @@ public class MainActivity extends Activity
         File sdcard = Environment.getExternalStorageDirectory();
 
         Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
-
         lastTimeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
                 Locale.getDefault()).format(new Date());
+        Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, lastTimeStamp));
+
         String mediaFile;
         mediaFile = dir.toString() + File.separator + "VID_" + lastTimeStamp + ".mp4";
         return mediaFile;

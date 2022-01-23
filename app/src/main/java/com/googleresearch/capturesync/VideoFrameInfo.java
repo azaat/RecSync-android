@@ -69,7 +69,8 @@ public class VideoFrameInfo implements Closeable {
                             if (mShouldSaveFrames && mFrameNumber % EVERY_N_FRAME == 0) {
                                 Bitmap bitmap = mYuvUtils.yuv420ToBitmap(imageData, width, height, mContext);
                                 File sdcard = Environment.getExternalStorageDirectory();
-                                File dir = new File(sdcard.getAbsolutePath(), SUBDIR_NAME);
+                                File pdir = new File(sdcard.getAbsolutePath(), SUBDIR_NAME);
+                                File dir = new File(pdir, mContext.getLastTimeStamp());
                                 File frameFile = new File(dir, timestamp + ".jpg");
 
                                 writeFrameJpeg(bitmap, frameFile);
