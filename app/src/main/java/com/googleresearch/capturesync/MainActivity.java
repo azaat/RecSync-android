@@ -347,16 +347,6 @@ public class MainActivity extends Activity {
         surfaceView.setVisibility(View.VISIBLE);
 
         startCameraThread();
-
-        try {
-            mRpcServer = new RemoteRpcServer(this);
-            mRpcServer.start();
-            Log.d(TAG, "App rpc listener thread started");
-
-        } catch (IOException e) {
-            e.printStackTrace();
-            mRpcServer = null;
-        }
     }
 
     @Override
@@ -608,6 +598,20 @@ public class MainActivity extends Activity {
             softwareSyncController =
                     new SoftwareSyncController(this, phaseAlignController, softwaresyncStatusTextView);
             setLeaderClientControls(softwareSyncController.isLeader());
+
+            // start server
+            if (softwareSyncController.isLeader()) {
+                try {
+
+                    mRpcServer = new RemoteRpcServer(this);
+                    mRpcServer.start();
+                    Log.d(TAG, "App rpc listener thread started");
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                    mRpcServer = null;
+                }
+            }
         } catch (IllegalStateException e) {
             // If wifi is disabled, start pick wifi activity.
             Log.e(
