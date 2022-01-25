@@ -179,14 +179,13 @@ public class RemoteRpcRequestHandler {
     }
 
     RemoteRpcResponse handleVideoStopRequest() {
-//        mContext.runOnUiThread(
-//                () -> {
-////                    Preview preview = mContext.getPreview();
-////                    if (preview.isVideo() && preview.isVideoRecording()) {
-////                        preview.stopVideo(false);
-////                    }
-//                }
-//        );
+        mContext.runOnUiThread(
+                () -> {
+                    if (mContext.isVideoRecording()) {
+                        mContext.stopOnLeader();
+                    }
+                }
+        );
         return mResponseBuilder.success("", mContext);
     }
 }

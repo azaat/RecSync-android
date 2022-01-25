@@ -643,6 +643,17 @@ public class MainActivity extends Activity {
                         "0");
     }
 
+    public void stopOnLeader() {
+        if (isVideoRecording) {
+            stopVideo();
+            ((SoftwareSyncLeader) softwareSyncController.softwareSync)
+                    .broadcastRpc(
+                            SoftwareSyncController.METHOD_STOP_RECORDING,
+                            "0");
+
+        }
+    }
+
     private void closeCamera() {
         stopPreview();
         captureSession = null;
