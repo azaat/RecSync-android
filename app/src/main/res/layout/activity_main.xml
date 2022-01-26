@@ -5,24 +5,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-    android:layout_marginVertical="@dimen/activity_vertical_margin"
+    android:layout_marginVertical="8dp"
     tools:context=".MainActivity">
 
-    <FrameLayout
+    <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginEnd="@dimen/activity_horizontal_margin">
-
-        <com.googleresearch.capturesync.AutoFitSurfaceView
-            android:id="@+id/viewfinder_surface_view"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"/>
-
-    </FrameLayout>
-
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
         android:orientation="vertical">
 
         <LinearLayout
@@ -105,8 +93,39 @@
                 android:max="10"
                 android:progress="3" />
 
+            <RadioGroup
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+                <RadioButton android:id="@+id/radio_close"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="1m"/>
+                <RadioButton android:id="@+id/radio_mid"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="4m"/>
+                <RadioButton android:id="@+id/radio_inf"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="8m"/>
+            </RadioGroup>
+
+
         </LinearLayout>
 
     </LinearLayout>
+
+    <FrameLayout
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/activity_horizontal_margin">
+
+        <com.googleresearch.capturesync.AutoFitSurfaceView
+            android:id="@+id/viewfinder_surface_view"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+
+    </FrameLayout>
 
 </LinearLayout>

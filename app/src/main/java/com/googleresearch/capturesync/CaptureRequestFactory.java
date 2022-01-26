@@ -56,7 +56,8 @@ public class CaptureRequestFactory {
           List<Surface> imageSurfaces,
           long sensorExposureTimeNs,
           int sensorSensitivity,
-          boolean wantAutoExp)
+          boolean wantAutoExp,
+          int focusDistM)
           throws CameraAccessException {
     CaptureRequest.Builder builder = device.createCaptureRequest(TEMPLATE_PREVIEW);
     if (wantAutoExp) {
@@ -71,7 +72,7 @@ public class CaptureRequestFactory {
 
     builder.set(CaptureRequest.CONTROL_AF_MODE,
             CONTROL_AE_MODE_OFF);
-    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1f);
+    builder.set(CaptureRequest.LENS_FOCUS_DISTANCE, 1f/focusDistM);
     // Auto white balance used, these could be locked and sent from the leader instead.
     builder.set(CONTROL_AWB_MODE, CONTROL_AWB_MODE_AUTO);
     builder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
@@ -102,9 +103,10 @@ public class CaptureRequestFactory {
           List<Surface> imageSurfaces,
           long sensorExposureTimeNs,
           int sensorSensitivity,
-          boolean wantAutoExp)
+          boolean wantAutoExp,
+          int focusDistM)
           throws CameraAccessException {
-    CaptureRequest.Builder builder = makePreview(viewfinderSurface, imageSurfaces, sensorExposureTimeNs, sensorSensitivity, wantAutoExp);
+    CaptureRequest.Builder builder = makePreview(viewfinderSurface, imageSurfaces, sensorExposureTimeNs, sensorSensitivity, wantAutoExp, focusDistM);
     // Add recorder surface
     if (recorderSurface != null) {
       builder.addTarget(recorderSurface);

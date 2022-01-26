@@ -54,6 +54,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.RadioButton;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
@@ -106,6 +107,10 @@ public class MainActivity extends Activity {
     private BlockingQueue<VideoPhaseInfo> mVideoPhaseInfoReporter;
     private VideoFrameInfo mVideoFrameInfo;
     private RemoteRpcServer mRpcServer;
+    private RadioButton radioMidFDist;
+    private RadioButton radioCloseFDist;
+    private RadioButton radioInfFDist;
+    private int currFdist = 1;
 
     public String getLastVideoPath() {
         return lastVideoPath;
@@ -454,6 +459,18 @@ public class MainActivity extends Activity {
                     );
                     periodTask.run();
                 }
+        );
+
+        radioMidFDist.setOnClickListener(
+                view -> currFdist = 4
+        );
+
+        radioCloseFDist.setOnClickListener(
+                view -> currFdist = 1
+        );
+
+        radioInfFDist.setOnClickListener(
+                view -> currFdist = 8
         );
 
         if (isLeader) {
@@ -891,6 +908,9 @@ public class MainActivity extends Activity {
         captureStillButton = findViewById(R.id.capture_still_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
+        radioMidFDist = findViewById(R.id.radio_mid);
+        radioCloseFDist = findViewById(R.id.radio_close);
+        radioInfFDist = findViewById(R.id.radio_inf);
 
         exposureSeekBar = findViewById(R.id.exposure_seekbar);
         sensitivitySeekBar = findViewById(R.id.sensitivity_seekbar);
@@ -1035,7 +1055,7 @@ public class MainActivity extends Activity {
                                     viewfinderSurface,
                                     cameraController.getOutputSurfaces(),
                                     currentSensorExposureTimeNs,
-                                    currentSensorSensitivity, wantAutoExp);
+                                    currentSensorSensitivity, wantAutoExp, currFdist);
 
             captureSession.stopRepeating();
             captureSession.setRepeatingRequest(
@@ -1164,7 +1184,7 @@ public class MainActivity extends Activity {
                                     cameraController.getOutputSurfaces(),
                                     currentSensorExposureTimeNs,
                                     currentSensorSensitivity,
-                                    wantAutoExp);
+                                    wantAutoExp, currFdist);
 
             captureSession.stopRepeating();
 
