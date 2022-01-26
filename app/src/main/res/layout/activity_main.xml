@@ -8,23 +8,10 @@
     android:layout_marginVertical="@dimen/activity_vertical_margin"
     tools:context=".MainActivity">
 
-    <FrameLayout
-        android:layout_width="300dp"
-        android:layout_height="300dp"
-        android:layout_marginEnd="@dimen/activity_horizontal_margin">
-
-        <android.opengl.GLSurfaceView
-            android:id="@+id/glsurfaceview"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top" />
-
-
-    </FrameLayout>
 
     <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:orientation="vertical">
 
         <LinearLayout
@@ -116,5 +103,19 @@
         </LinearLayout>
 
     </LinearLayout>
+    <FrameLayout
+        android:layout_width="300dp"
+        android:layout_height="300dp"
+        android:layout_marginStart="@dimen/activity_horizontal_margin">
+
+        <android.opengl.GLSurfaceView
+            android:id="@+id/glsurfaceview"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="top" />
+
+
+    </FrameLayout>
+
 
 </LinearLayout>
