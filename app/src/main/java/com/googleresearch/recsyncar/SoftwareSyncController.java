@@ -19,6 +19,7 @@ package com.googleresearch.recsyncar;
 import android.content.Context;
 import android.graphics.Color;
 import android.net.wifi.WifiManager;
+import android.os.SystemClock;
 import android.provider.Settings.Secure;
 import android.util.Log;
 import android.widget.TextView;
@@ -167,7 +168,7 @@ public class SoftwareSyncController implements Closeable {
 
         if (isLeader) {
             // Leader.
-            long initTimeNs = TimeUtils.millisToNanos(System.currentTimeMillis());
+            long initTimeNs = SystemClock.elapsedRealtimeNanos();
             // Create rpc mapping specific to leader.
             Map<Integer, RpcCallback> leaderRpcs = new HashMap<>(sharedRpcs);
             leaderRpcs.put(SyncConstants.METHOD_MSG_ADDED_CLIENT, payload -> updateClientsUI());
