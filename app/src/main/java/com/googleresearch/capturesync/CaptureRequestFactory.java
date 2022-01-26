@@ -75,7 +75,7 @@ public class CaptureRequestFactory {
     builder.set(LENS_OPTICAL_STABILIZATION_MODE, LENS_OPTICAL_STABILIZATION_MODE_OFF);
 
     // Auto focus is used since different devices may have different manual focus values.
-    builder.set(CONTROL_AF_MODE, CONTROL_AF_MODE_CONTINUOUS_PICTURE);
+//    builder.set(CONTROL_AF_MODE, CONTROL_AF_MODE_CONTINUOUS_PICTURE);
 
     if (viewfinderSurface != null) {
       builder.addTarget(viewfinderSurface);
