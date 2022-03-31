@@ -23,7 +23,7 @@ public class CSVLogger {
 
     public CSVLogger(String dirName, String filename, CameraActivity context) throws IOException {
         isClosed = true;
-        File sdcard = Environment.getExternalStorageDirectory();
+        File sdcard = context.getExternalDir();
         Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), dirName));
         File file = new File(dir.toFile(), filename);
         writer = new BufferedWriter(new FileWriter(file, true));

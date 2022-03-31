@@ -7,4 +7,6 @@ public interface FrameInfo {
     public ArrayDeque<Long> getLatestFrames();
 
     public void displayStreamFrame(File streamFrame);
+
+    public File getExternalDir();
 }

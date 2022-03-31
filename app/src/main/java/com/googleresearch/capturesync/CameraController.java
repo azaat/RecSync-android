@@ -191,7 +191,7 @@ public class CameraController {
 
   public void prepareFrameSaving(CameraActivity context) {
     // should be called when new video is started
-    File sdcard = Environment.getExternalStorageDirectory();
+    File sdcard = context.getExternalDir();
     try {
       outputDir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), CameraActivity.SUBDIR_NAME, context.getLastTimeStamp()));
     } catch (IOException e) {

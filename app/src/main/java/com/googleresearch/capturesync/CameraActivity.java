@@ -202,6 +202,10 @@ public class CameraActivity extends Activity implements FrameInfo {
         }
     }
 
+    public File getExternalDir() {
+        return getExternalFilesDir(null);
+    }
+
     public Integer getLastVideoSeqId() {
         return lastVideoSeqId;
     }
@@ -879,7 +883,7 @@ public class CameraActivity extends Activity implements FrameInfo {
 //      }
 //    }
 
-        File sdcard = Environment.getExternalStorageDirectory();
+        File sdcard = getExternalDir();
 
         Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
 

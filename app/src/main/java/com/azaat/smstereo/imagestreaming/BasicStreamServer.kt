@@ -16,9 +16,10 @@ import java.nio.file.Paths
  */
 class BasicStreamServer(
     private val utils: FileTransferUtils,
-    frameInfo: FrameInfo,
+    private val frameInfo: FrameInfo,
     private val timeDomainConverter: SoftwareSyncBase
 ) : StreamServer() {
+
     @Volatile
     override var isExecuting = false
         private set
@@ -28,7 +29,7 @@ class BasicStreamServer(
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = Environment.getExternalStorageDirectory()
+                val sdcard = frameInfo.externalDir
                 val outputDir = Files.createDirectories(
                     Paths.get(
                         sdcard.absolutePath,

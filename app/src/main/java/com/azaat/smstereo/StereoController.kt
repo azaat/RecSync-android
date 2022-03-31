@@ -1,30 +1,27 @@
-package com.azaat.smstereo;
+package com.azaat.smstereo
 
-public class StereoController {
+import java.lang.RuntimeException
+import kotlin.Throws
 
-    public boolean isCalibrationDataAvailable() {
-        return false;
-    }
+class StereoController {
+    val isCalibrationDataAvailable: Boolean
+        get() = false
 
     /**
      * Records a stereo sequence, processes recorded frames
      */
-    public void runStereoCalibration() {
-
-    }
+    fun runStereoCalibration() {}
 
     /**
      *
      * @throws RuntimeException
      */
-    public void runStereoRecordingWithDepth() throws RuntimeException {
-        if (!isCalibrationDataAvailable()) {
-            throw new RuntimeException("Calibration data unavailable");
+    @Throws(RuntimeException::class)
+    fun runStereoRecordingWithDepth() {
+        if (!isCalibrationDataAvailable) {
+            throw RuntimeException("Calibration data unavailable")
         }
     }
 
-    private void runStereoRecordingSession() {
-
-    }
-
+    private fun runStereoRecordingSession() {}
 }
