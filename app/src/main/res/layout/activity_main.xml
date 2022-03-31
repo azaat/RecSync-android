@@ -4,8 +4,6 @@
     android:orientation="horizontal"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
-    android:layout_marginVertical="@dimen/activity_vertical_margin"
     tools:context=".CameraActivity">
 
 
@@ -23,17 +21,21 @@
             android:id="@+id/stream_preview_iv"
             android:layout_width="200dp"
             android:layout_height="200dp"
-            android:layout_gravity="right"/>
+            android:layout_gravity="start"/>
 
         <LinearLayout
             android:layout_width="200dp"
             android:layout_height="match_parent"
+            android:background="@color/white"
+            android:layout_gravity="end"
             android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/status_area"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+                android:layout_marginVertical="@dimen/activity_vertical_margin"
                 android:orientation="vertical">
 
                 <TextView
@@ -49,11 +51,16 @@
                 android:id="@+id/control_area"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginHorizontal="@dimen/activity_horizontal_margin"
+                android:layout_marginVertical="@dimen/activity_vertical_margin"
                 android:orientation="vertical">
-                <Button
-                    android:id="@+id/capture_still_button"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
+
+                <ImageButton
+                    android:id="@+id/record_button"
+                    android:background="@drawable/round"
+                    android:layout_gravity="center_horizontal"
+                    android:layout_width="50dp"
+                    android:layout_height="50dp"
                     android:text="@string/action_capture_still"/>
 
                 <TextView

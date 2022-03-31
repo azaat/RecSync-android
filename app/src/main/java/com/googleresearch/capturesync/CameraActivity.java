@@ -42,7 +42,6 @@ import android.media.MediaCodec;
 import android.media.MediaRecorder;
 import android.net.wifi.WifiManager;
 import android.os.Bundle;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -55,6 +54,7 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
@@ -125,7 +125,7 @@ public class CameraActivity extends Activity implements FrameInfo {
     // Top level UI windows.
     private int lastOrientation = Configuration.ORIENTATION_UNDEFINED;
     // UI controls.
-    private Button captureStillButton;
+    private ImageButton recordButton;
     private Button getPeriodButton;
     private Button phaseAlignButton;
     private SeekBar exposureSeekBar;
@@ -309,14 +309,15 @@ public class CameraActivity extends Activity implements FrameInfo {
 
         // Fit an image inside a rectangle maximizing the resulting area and centering (coordinates are
         // rounded down).
-        params.width =
-                Math.min(
-                        displaySize.x,
-                        displaySize.y * viewfinderResolution.getWidth() / viewfinderResolution.getHeight());
-        params.height =
-                Math.min(
-                        displaySize.x * viewfinderResolution.getHeight() / viewfinderResolution.getWidth(),
-                        displaySize.y);
+        float ratio = 1f;
+        if (viewfinderResolution.getWidth() > viewfinderResolution.getHeight()) {
+            ratio = (float) viewfinderResolution.getWidth() / displaySize.x;
+        } else {
+            ratio = (float) viewfinderResolution.getHeight() / displaySize.y;
+        }
+
+        params.width = (int) (viewfinderResolution.getWidth() / ratio);
+        params.height = (int) (viewfinderResolution.getHeight() / ratio);
         params.gravity = Gravity.CENTER;
 
         surfaceView.setLayoutParams(params);
@@ -436,13 +437,13 @@ public class CameraActivity extends Activity implements FrameInfo {
 
         if (isLeader) {
             // Leader, all controls visible and set.
-            captureStillButton.setVisibility(View.VISIBLE);
+            recordButton.setVisibility(View.VISIBLE);
             phaseAlignButton.setVisibility(View.VISIBLE);
             getPeriodButton.setVisibility(View.VISIBLE);
             exposureSeekBar.setVisibility(View.VISIBLE);
             sensitivitySeekBar.setVisibility(View.VISIBLE);
 
-            captureStillButton.setOnClickListener(
+            recordButton.setOnClickListener(
                     view -> {
                         if (isVideoRecording) {
                             stopVideo();
@@ -529,13 +530,13 @@ public class CameraActivity extends Activity implements FrameInfo {
                     });
         } else {
             // Client. All controls invisible.
-            captureStillButton.setVisibility(View.INVISIBLE);
+            recordButton.setVisibility(View.INVISIBLE);
             phaseAlignButton.setVisibility(View.INVISIBLE);
             getPeriodButton.setVisibility(View.VISIBLE);
             exposureSeekBar.setVisibility(View.INVISIBLE);
             sensitivitySeekBar.setVisibility(View.INVISIBLE);
 
-            captureStillButton.setOnClickListener(null);
+            recordButton.setOnClickListener(null);
             phaseAlignButton.setOnClickListener(null);
             exposureSeekBar.setOnSeekBarChangeListener(null);
             sensitivitySeekBar.setOnSeekBarChangeListener(null);
@@ -701,7 +702,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         phaseTextView = findViewById(R.id.phase);
 
         // Controls.
-        captureStillButton = findViewById(R.id.capture_still_button);
+        recordButton = findViewById(R.id.record_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
 
