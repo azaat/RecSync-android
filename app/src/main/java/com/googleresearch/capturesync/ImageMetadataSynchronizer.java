@@ -26,11 +26,9 @@ import android.media.ImageReader;
 import android.os.Handler;
 import android.util.Log;
 import android.util.Pair;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
-import java.io.File;
 import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
@@ -130,7 +128,7 @@ public class ImageMetadataSynchronizer {
   // instances of ImageReader on behalf of the caller.
   // TODO(jiawen): wrap ImageMetadataSynchronizer-owned images in an interface that's not closeable.
   private static final String TAG = "ImageMetadataSynchronizer";
-  private final MainActivity context;
+  private final CameraActivity context;
 
   /**
    * To use {@link ImageMetadataSynchronizer}, each {@link CaptureRequest} must be tagged with an
@@ -294,7 +292,7 @@ public class ImageMetadataSynchronizer {
    * <p>Callback.onDataAvailable() is called with Image's in the same order as imageReaders.
    */
   @SuppressWarnings("JdkObsolete")
-  public ImageMetadataSynchronizer(List<ImageReader> imageReaders, Handler imageHandler, MainActivity context) {
+  public ImageMetadataSynchronizer(List<ImageReader> imageReaders, Handler imageHandler, CameraActivity context) {
     closed = false;
     this.context = context;
     createCaptureCallback();

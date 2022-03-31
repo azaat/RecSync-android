@@ -90,7 +90,7 @@ public class CameraController {
           Size rawImageResolution,
           Size yuvImageResolution,
           PhaseAlignController phaseAlignController,
-          MainActivity context,
+          CameraActivity context,
           TimeDomainConverter timeDomainConverter
           ) {
     imageThread = new HandlerThread("ImageThread");

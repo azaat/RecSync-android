@@ -88,7 +88,7 @@ import org.json.JSONObject;
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class MainActivity extends Activity {
+public class CameraActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
     private String lastTimeStamp;

@@ -1,14 +1,8 @@
 package com.googleresearch.capturesync.softwaresync;
 
-import android.content.Context;
-import android.hardware.camera2.CameraAccessException;
-import android.hardware.camera2.CameraCharacteristics;
-import android.hardware.camera2.CameraManager;
-import android.hardware.camera2.CameraMetadata;
-import android.os.Build;
 import android.os.Environment;
 
-import com.googleresearch.capturesync.MainActivity;
+import com.googleresearch.capturesync.CameraActivity;
 
 import java.io.BufferedWriter;
 import java.io.File;
@@ -17,8 +11,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashMap;
-import java.util.Map;
 
 public class CSVLogger {
     private final BufferedWriter writer;
@@ -29,7 +21,7 @@ public class CSVLogger {
 
     private volatile boolean isClosed;
 
-    public CSVLogger(String dirName, String filename, MainActivity context) throws IOException {
+    public CSVLogger(String dirName, String filename, CameraActivity context) throws IOException {
         isClosed = true;
         File sdcard = Environment.getExternalStorageDirectory();
         Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), dirName));

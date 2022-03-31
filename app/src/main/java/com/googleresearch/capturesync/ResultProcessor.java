@@ -44,7 +44,7 @@ public class ResultProcessor {
   private static final String TAG = "ResultProcessor";
 
   private final Handler handler;
-  private final MainActivity context;
+  private final CameraActivity context;
   private final TimeDomainConverter timeDomainConverter;
 
   // Copy from constants... make it a user parameter.
@@ -53,7 +53,7 @@ public class ResultProcessor {
 
   public ResultProcessor(
       TimeDomainConverter timeDomainConverter,
-      MainActivity context,
+      CameraActivity context,
       boolean saveJpgFromYuv,
       int jpgQuality) {
     this.timeDomainConverter = timeDomainConverter;

@@ -47,7 +47,7 @@ import java.util.Map.Entry;
 public class SoftwareSyncController implements Closeable {
 
     private static final String TAG = "SoftwareSyncController";
-    private final MainActivity context;
+    private final CameraActivity context;
     private final TextView statusView;
     private final PhaseAlignController phaseAlignController;
     private boolean isLeader;
@@ -71,7 +71,7 @@ public class SoftwareSyncController implements Closeable {
      * TextView used to show currently connected clients on the leader device.
      */
     public SoftwareSyncController(
-            MainActivity context, PhaseAlignController phaseAlignController, TextView statusView) {
+            CameraActivity context, PhaseAlignController phaseAlignController, TextView statusView) {
         this.context = context;
         this.phaseAlignController = phaseAlignController;
         this.statusView = statusView;
