@@ -27,7 +27,6 @@ import android.content.res.Configuration;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
-import android.hardware.Sensor;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -54,18 +53,12 @@ import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.RadioButton;
 import android.widget.SeekBar;
 import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import com.googleresearch.capturesync.sensorlogging.RawSensorInfo;
-import com.googleresearch.capturesync.sensorlogging.VideoFrameInfo;
-import com.googleresearch.capturesync.sensorlogging.VideoPhaseInfo;
-import com.googleresearch.capturesync.sensorremote.RemoteRpcServer;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
-import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
 import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
@@ -84,12 +77,8 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-import java.util.concurrent.ArrayBlockingQueue;
-import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
 
@@ -104,13 +93,6 @@ public class MainActivity extends Activity {
     private static final int STATIC_LEN = 15_000;
     private String lastTimeStamp;
     private PeriodCalculator periodCalculator;
-    private BlockingQueue<VideoPhaseInfo> mVideoPhaseInfoReporter;
-    private VideoFrameInfo mVideoFrameInfo;
-    private RemoteRpcServer mRpcServer;
-    private RadioButton radioMidFDist;
-    private RadioButton radioCloseFDist;
-    private RadioButton radioInfFDist;
-    private int currFdist = 1;
 
     public String getLastVideoPath() {
         return lastVideoPath;
@@ -147,11 +129,9 @@ public class MainActivity extends Activity {
 
     private CSVLogger mLogger;
 
-    private RawSensorInfo mRawSensorInfo;
-
     private int curSequence;
 
-    public static final String SUBDIR_NAME = "RecSync";
+    private static final String SUBDIR_NAME = "RecSync";
 
     private boolean permissionsGranted = false;
 
@@ -252,7 +232,6 @@ public class MainActivity extends Activity {
     }
 
     private void onCreateWithPermission() {
-
         setContentView(R.layout.activity_main);
         send2aHandler = new Handler();
 
@@ -276,13 +255,6 @@ public class MainActivity extends Activity {
         // We need this because #onConfigurationChanged doesn't get called when
         // the app launches
         maybeUpdateConfiguration(getResources().getConfiguration());
-
-        this.mRawSensorInfo = new RawSensorInfo(this);
-        Log.d(TAG, "Created RawSensorInfo object");
-    }
-
-    public SoftwareSyncBase getTimeConverter() {
-        return softwareSyncController.softwareSync;
     }
 
     private void setupPhaseAlignController() {
@@ -364,15 +336,7 @@ public class MainActivity extends Activity {
         surfaceView.getHolder().removeCallback(surfaceCallback);
         surfaceView.setVisibility(View.GONE);
 
-        // Stop Remote controller for OpenCamera Sensors
-        if (mRpcServer != null) {
-            mRpcServer.stopExecuting();
-            mRpcServer = null;
-        }
-
-
         super.onPause(); // required
-
     }
 
     private void startCameraThread() {
@@ -405,8 +369,6 @@ public class MainActivity extends Activity {
                             startSoftwareSync();
                             initCameraController();
                             configureCaptureSession(); // calls startPreview();
-
-                            mVideoPhaseInfoReporter = new ArrayBlockingQueue<>(1);
                         }
 
                         @Override
@@ -459,18 +421,6 @@ public class MainActivity extends Activity {
                     );
                     periodTask.run();
                 }
-        );
-
-        radioMidFDist.setOnClickListener(
-                view -> currFdist = 4
-        );
-
-        radioCloseFDist.setOnClickListener(
-                view -> currFdist = 1
-        );
-
-        radioInfFDist.setOnClickListener(
-                view -> currFdist = 8
         );
 
         if (isLeader) {
@@ -615,20 +565,6 @@ public class MainActivity extends Activity {
             softwareSyncController =
                     new SoftwareSyncController(this, phaseAlignController, softwaresyncStatusTextView);
             setLeaderClientControls(softwareSyncController.isLeader());
-
-            // start server
-            if (softwareSyncController.isLeader()) {
-                try {
-
-                    mRpcServer = new RemoteRpcServer(this);
-                    mRpcServer.start();
-                    Log.d(TAG, "App rpc listener thread started");
-
-                } catch (IOException e) {
-                    e.printStackTrace();
-                    mRpcServer = null;
-                }
-            }
         } catch (IllegalStateException e) {
             // If wifi is disabled, start pick wifi activity.
             Log.e(
@@ -654,25 +590,6 @@ public class MainActivity extends Activity {
             throw new IllegalArgumentException("Error reading JSON file: ", e);
         }
         return PhaseConfig.parseFromJSON(json);
-    }
-
-    public void startOnLeader() {
-        startVideo(false);
-        ((SoftwareSyncLeader) softwareSyncController.softwareSync)
-                .broadcastRpc(
-                        SoftwareSyncController.METHOD_START_RECORDING,
-                        "0");
-    }
-
-    public void stopOnLeader() {
-        if (isVideoRecording) {
-            stopVideo();
-            ((SoftwareSyncLeader) softwareSyncController.softwareSync)
-                    .broadcastRpc(
-                            SoftwareSyncController.METHOD_STOP_RECORDING,
-                            "0");
-
-        }
     }
 
     private void closeCamera() {
@@ -804,62 +721,6 @@ public class MainActivity extends Activity {
                 });
     }
 
-    public RawSensorInfo getRawSensorInfoManager() {
-        return mRawSensorInfo;
-    }
-
-    public void startImu(
-            boolean wantAccel, boolean wantGyro,
-            boolean wantMagnetic, boolean wantGravity,
-            boolean wantRotation, Date currentDate
-    ) {
-        if (wantAccel) {
-            if (!mRawSensorInfo.enableSensor(Sensor.TYPE_ACCELEROMETER, 0)) {
-                Log.d(TAG, "Sensor unavailable");
-            }
-        }
-        if (wantGyro) {
-            if (!mRawSensorInfo.enableSensor(Sensor.TYPE_GYROSCOPE, 0)) {
-                Log.d(TAG, "Sensor unavailable");
-            }
-        }
-        if (wantMagnetic) {
-            if (!mRawSensorInfo.enableSensor(Sensor.TYPE_MAGNETIC_FIELD, 0)) {
-                Log.d(TAG, "Sensor unavailable");
-            }
-        }
-
-//        if (!mRawSensorInfo.enableSensor(RawSensorInfo.TYPE_GPS, 0)) {
-//            mMainActivity.getPreview().showToast(null, "GPS unavailable");
-//        }
-
-
-//        //mRawSensorInfo.startRecording(mMainActivity, mLastVideoDate, get Pref(), getAccelPref())
-//        if (wantRotation) {
-//            int rotationSampleRate = getSensorSampleRatePref(PreferenceKeys.RotationSampleRatePreferenceKey);
-//            if (!mRawSensorInfo.enableSensor(Sensor.TYPE_ROTATION_VECTOR, rotationSampleRate)) {
-//                mMainActivity.getPreview().showToast(null, "Rotation vector unavailable");
-//            }
-//        }
-//
-//        if (wantGravity) {
-//            int gravitySampleRate = getSensorSampleRatePref(PreferenceKeys.GravitySampleRatePreferenceKey);
-//            if (!mRawSensorInfo.enableSensor(Sensor.TYPE_GRAVITY, gravitySampleRate)) {
-//                mMainActivity.getPreview().showToast(null, "Gravity unavailable");
-//            }
-//        }
-
-        //mRawSensorInfo.startRecording(mMainActivity, mLastVideoDate, get Pref(), getAccelPref())
-        Map<Integer, Boolean> wantSensorRecordingMap = new HashMap<>();
-        wantSensorRecordingMap.put(Sensor.TYPE_ACCELEROMETER, wantAccel);
-        wantSensorRecordingMap.put(Sensor.TYPE_GYROSCOPE, wantGyro);
-        mRawSensorInfo.startRecording(this, currentDate, wantSensorRecordingMap);
-    }
-
-    public BlockingQueue<VideoPhaseInfo> getVideoPhaseInfoReporter() {
-        return mVideoPhaseInfoReporter;
-    }
-
     /**
      * Compares two {@code Size}s based on their areas.
      */
@@ -908,9 +769,6 @@ public class MainActivity extends Activity {
         captureStillButton = findViewById(R.id.capture_still_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
-        radioMidFDist = findViewById(R.id.radio_mid);
-        radioCloseFDist = findViewById(R.id.radio_close);
-        radioInfFDist = findViewById(R.id.radio_inf);
 
         exposureSeekBar = findViewById(R.id.exposure_seekbar);
         sensitivitySeekBar = findViewById(R.id.sensitivity_seekbar);
@@ -1055,7 +913,7 @@ public class MainActivity extends Activity {
                                     viewfinderSurface,
                                     cameraController.getOutputSurfaces(),
                                     currentSensorExposureTimeNs,
-                                    currentSensorSensitivity, wantAutoExp, currFdist);
+                                    currentSensorSensitivity, wantAutoExp);
 
             captureSession.stopRepeating();
             captureSession.setRepeatingRequest(
@@ -1129,7 +987,7 @@ public class MainActivity extends Activity {
         recorder.setOutputFile(lastVideoPath);
 
         CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
-        recorder.setVideoSize(640, 480);
+        recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
         recorder.setVideoEncodingBitRate(profile.videoBitRate);
 
         recorder.setVideoEncoder(MediaRecorder.VideoEncoder.H264);
@@ -1151,10 +1009,6 @@ public class MainActivity extends Activity {
         return isVideoRecording;
     }
 
-    public VideoFrameInfo getVideoFrameInfo() {
-        return mVideoFrameInfo;
-    }
-
     public void startVideo(boolean wantAutoExp) {
         Log.d(TAG, "Starting video.");
         Toast.makeText(this, "Started recording video", Toast.LENGTH_LONG).show();
@@ -1169,10 +1023,6 @@ public class MainActivity extends Activity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
-            mVideoFrameInfo = new VideoFrameInfo(
-                    this, false, getVideoPhaseInfoReporter()
-            );
-
             mediaRecorder.prepare();
             Log.d(TAG, "MediaRecorder surface " + surface);
             CaptureRequest.Builder previewRequestBuilder =
@@ -1184,7 +1034,7 @@ public class MainActivity extends Activity {
                                     cameraController.getOutputSurfaces(),
                                     currentSensorExposureTimeNs,
                                     currentSensorSensitivity,
-                                    wantAutoExp, currFdist);
+                                    wantAutoExp);
 
             captureSession.stopRepeating();
 

@@ -18,7 +18,7 @@
     <activity
         android:name=".MainActivity"
         android:exported="true"
-        android:screenOrientation="reverseLandscape"
+        android:screenOrientation="landscape"
         android:launchMode="singleInstance" >
       <intent-filter>
         <action android:name="android.intent.action.MAIN" />

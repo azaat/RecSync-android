@@ -33,7 +33,7 @@ def match(vid_1, vid_2):
         lambda x: int(os.path.splitext(os.path.basename(x))[0]),
         out_images_2)))
 
-    THRESHOLD_NS = 5000000
+    THRESHOLD_NS = 100000
 
     left = pd.DataFrame({'t': image_timestamps_1,
                          'left': image_timestamps_1}, dtype=int)
