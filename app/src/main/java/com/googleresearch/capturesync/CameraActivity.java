@@ -152,7 +152,7 @@ public class CameraActivity extends Activity implements FrameInfo {
     private PhaseAlignController phaseAlignController;
     private int numCaptures;
     private Toast latestToast;
-    private Surface surface;
+    private Surface recorderSurface;
     private final SurfaceHolder.Callback surfaceCallback =
             new SurfaceHolder.Callback() {
 
@@ -600,7 +600,7 @@ public class CameraActivity extends Activity implements FrameInfo {
     private void closeCamera() {
         stopPreview();
         captureSession = null;
-        surface.release();
+        recorderSurface.release();
         if (cameraController != null) {
             cameraController.close();
             cameraController = null;
@@ -803,10 +803,9 @@ public class CameraActivity extends Activity implements FrameInfo {
         Log.d(TAG, "viewfinderSurface valid? " + viewfinderSurface.isValid());
         outputSurfaces.add(viewfinderSurface);
 
-        // MROB. Added MediaRecorder surface
         try {
             createRecorderSurface();
-            outputSurfaces.add(surface);
+            outputSurfaces.add(recorderSurface);
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -883,9 +882,9 @@ public class CameraActivity extends Activity implements FrameInfo {
     }
 
     private void createRecorderSurface() throws IOException {
-        surface = MediaCodec.createPersistentInputSurface();
+        recorderSurface = MediaCodec.createPersistentInputSurface();
 
-        MediaRecorder recorder = setUpMediaRecorder(surface, false);
+        MediaRecorder recorder = setUpMediaRecorder(recorderSurface, false);
         recorder.prepare();
         recorder.release();
         deleteUnusedVideo();
@@ -939,7 +938,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         isVideoRecording = true;
         cameraController.prepareFrameSaving(this);
         try {
-            mediaRecorder = setUpMediaRecorder(surface);
+            mediaRecorder = setUpMediaRecorder(recorderSurface);
             String filename = lastTimeStamp + ".csv";
             // Creates frame timestamps logger
             try {
@@ -948,12 +947,12 @@ public class CameraActivity extends Activity implements FrameInfo {
                 e.printStackTrace();
             }
             mediaRecorder.prepare();
-            Log.d(TAG, "MediaRecorder surface " + surface);
+            Log.d(TAG, "MediaRecorder surface " + recorderSurface);
             CaptureRequest.Builder previewRequestBuilder =
                     cameraController
                             .getRequestFactory()
                             .makeVideo(
-                                    surface,
+                                    recorderSurface,
                                     viewfinderSurface,
                                     cameraController.getOutputSurfaces(),
                                     currentSensorExposureTimeNs,
@@ -978,7 +977,18 @@ public class CameraActivity extends Activity implements FrameInfo {
         // Switch to preview again
         cameraController.stopFrameSaving(this);
         Toast.makeText(this, "Stopped recording video", Toast.LENGTH_LONG).show();
-        startPreview();
+        try {
+            captureSession.stopRepeating();
+            captureSession.close();
+        } catch (CameraAccessException e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void stopVideoPostPrepare() {
+        mediaRecorder.reset();
+        recorderSurface.release();
+        configureCaptureSession();
     }
 
     private void stopPreview() {

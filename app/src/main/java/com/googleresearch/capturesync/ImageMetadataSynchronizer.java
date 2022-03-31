@@ -393,7 +393,7 @@ public class ImageMetadataSynchronizer {
             super.onCaptureSequenceCompleted(session, sequenceId, frameNumber);
             if (context.getLastVideoSeqId() != null && sequenceId == context.getLastVideoSeqId() && context.getLogger() != null) {
               context.getMediaRecorder().stop();
-
+              context.stopVideoPostPrepare();
               if (context.isVideoRecording()) {
                 context.setVideoRecording(false);
               } else {
