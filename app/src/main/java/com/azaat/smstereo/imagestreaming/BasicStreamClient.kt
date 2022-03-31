@@ -15,7 +15,7 @@ class BasicStreamClient
     // open socket connection
     (private var address: InetAddress, var utils: FileTransferUtils) : StreamClient() {
     private val frameProcessor = Executors.newSingleThreadExecutor()
-    var clientSocket: Socket? = null
+    lateinit var clientSocket: Socket
     override fun onVideoFrame(frame: File, timestampNs: Long) {
         // send frame over the channel
         if (!frameProcessor.isShutdown) {
@@ -23,7 +23,7 @@ class BasicStreamClient
                 try {
                     Log.d(TAG, "Sending frame")
                     clientSocket = Socket(address, PORT)
-                    utils.sendFile(frame, clientSocket!!)
+                    utils.sendFile(frame, clientSocket)
                 } catch (e: IOException) {
                     e.printStackTrace()
                     Log.d(TAG, "Error sending frame")
@@ -34,7 +34,9 @@ class BasicStreamClient
 
     override fun closeConnection() {
         try {
-            clientSocket!!.close()
+            if (::clientSocket.isInitialized) {
+                clientSocket.close()
+            }
         } catch (e: IOException) {
             e.printStackTrace()
         }

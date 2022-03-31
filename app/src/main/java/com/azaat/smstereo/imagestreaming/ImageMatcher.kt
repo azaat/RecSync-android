@@ -11,23 +11,26 @@ class ImageMatcher(private val frameInfo: FrameInfo) {
         val timestamp =
             clientFrame.name.split("_").dropLastWhile { it.isEmpty() }.toTypedArray()[0].toLong()
         val latestFrames = frameInfo.latestFrames
-        val matchingTimestamp = latestFrames.stream()
-            .filter { leaderTimestamp: Long? -> leaderTimestamp!! - timestamp < MATCHING_THRESHOLD }
-            .min(Comparator.comparingLong { leaderTimestamp: Long? ->
-                Math.abs(
-                    leaderTimestamp!! - timestamp
-                )
+        if (!latestFrames.isEmpty()) {
+            val matchingTimestamp = latestFrames.stream()
+                .filter { leaderTimestamp: Long -> leaderTimestamp - timestamp < MATCHING_THRESHOLD }
+                .min(Comparator.comparingLong { leaderTimestamp: Long ->
+                    Math.abs(
+                        leaderTimestamp - timestamp
+                    )
+                }
+                ).orElse(null)
+            if (matchingTimestamp != null) {
+                Log.d(TAG, "Found match for the client frame: $matchingTimestamp $timestamp")
+                val delay = timestamp - timeDomainConverter.leaderTimeNs
+                Log.d(TAG, "Delay: $delay")
+            } else {
+                Log.d(TAG, "Match not found")
+                Log.d(TAG, "Client: $timestamp")
+                Log.d(TAG, "Leader ts: $latestFrames")
             }
-            ).orElse(null)
-        if (matchingTimestamp != null) {
-            Log.d(TAG, "Found match for the client frame: $matchingTimestamp $timestamp")
-            val delay = timestamp - timeDomainConverter.leaderTimeNs
-            Log.d(TAG, "Delay: $delay")
-        } else {
-            Log.d(TAG, "Match not found")
-            Log.d(TAG, "Client: $timestamp")
-            Log.d(TAG, "Leader ts: $latestFrames")
         }
+
         frameInfo.displayStreamFrame(clientFrame)
         // reports image pair to the depth estimator?
     }

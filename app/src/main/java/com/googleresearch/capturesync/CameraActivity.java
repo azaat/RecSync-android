@@ -872,22 +872,8 @@ public class CameraActivity extends Activity implements FrameInfo {
      * returning video file
      */
     private String getOutputMediaFilePath() throws IOException {
-//    // External sdcard file location
-//    File mediaStorageDir = new File(Environment.getExternalStorageDirectory(),
-//            "MROB_VID");
-//    // Create storage directory if it does not exist
-//    if (!mediaStorageDir.exists()) {
-//      if (!mediaStorageDir.mkdirs()) {
-//        Log.d(TAG, "Oops! Failed create "
-//                + "MROB_VID" + " directory");
-//        return null;
-//      }
-//    }
-
         File sdcard = getExternalDir();
-
         Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
-
         lastTimeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
                 Locale.getDefault()).format(new Date());
         String mediaFile;
