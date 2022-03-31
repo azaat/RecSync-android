@@ -1,7 +1,6 @@
-package imagestreaming;
+package com.azaat.smstereo.imagestreaming
 
-public abstract class StreamServer extends Thread {
-    public abstract boolean isExecuting();
-
-    public abstract void stopExecuting();
+abstract class StreamServer : Thread() {
+    abstract val isExecuting: Boolean
+    abstract fun stopExecuting()
 }

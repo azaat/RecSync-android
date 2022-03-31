@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 The Google Research Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -25,8 +25,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import imagestreaming.FileTransferUtils;
-import imagestreaming.BasicStreamClient;
+import com.azaat.smstereo.imagestreaming.FileTransferUtils;
+import com.azaat.smstereo.imagestreaming.BasicStreamClient;
 
 /**
  * Client which registers and synchronizes clocks with SoftwareSyncLeader. This allows it to receive
@@ -118,11 +118,7 @@ public class SoftwareSyncClient extends SoftwareSyncBase {
     heartbeatScheduler.scheduleAtFixedRate(
         this::sendHeartbeat, 0, SyncConstants.HEARTBEAT_PERIOD_NS, TimeUnit.NANOSECONDS);
 
-    try {
-      setStreamClient(new BasicStreamClient(leaderAddress, fileUtils));
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
+    setStreamClient(new BasicStreamClient(leaderAddress, fileUtils));
   }
 
   /* Resets the client synchronization state. */

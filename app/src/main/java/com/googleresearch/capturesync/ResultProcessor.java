@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 The Google Research Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -28,7 +28,7 @@ import android.os.HandlerThread;
 import android.provider.MediaStore;
 import android.util.Log;
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
-import com.googleresearch.capturesync.softwaresync.TimeUtils;
+
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
@@ -44,21 +44,19 @@ public class ResultProcessor {
   private static final String TAG = "ResultProcessor";
 
   private final Handler handler;
-  private final MainActivity context;
+  private final CameraActivity context;
   private final TimeDomainConverter timeDomainConverter;
 
-  // Copy from constants... make it a user parameter.
-  private final boolean saveJpgFromNv21;
   private final int jpgQuality;
 
   public ResultProcessor(
       TimeDomainConverter timeDomainConverter,
-      MainActivity context,
+      CameraActivity context,
       boolean saveJpgFromYuv,
       int jpgQuality) {
     this.timeDomainConverter = timeDomainConverter;
     this.context = context;
-    this.saveJpgFromNv21 = saveJpgFromYuv;
+    // Copy from constants... make it a user parameter.
     this.jpgQuality = jpgQuality;
 
     HandlerThread thread = new HandlerThread(TAG);
@@ -74,7 +72,6 @@ public class ResultProcessor {
 
   private void processStill(final Frame frame, String basename) {
     File captureDir = new File(basename);
-//    File captureDir = new File()
     if (!captureDir.exists() && !captureDir.mkdirs()) {
       throw new IllegalStateException("Could not create dir " + captureDir);
     }
@@ -83,62 +80,12 @@ public class ResultProcessor {
     // Timestamp in leader domain ie. synchronized time on leader device in nanoseconds.
     long syncedSensorTimestampNs =
         timeDomainConverter.leaderTimeForLocalTimeNs(localSensorTimestampNs);
-    // Use syncedSensorTimestamp in milliseconds for filenames.
-    long syncedSensorTimestampMs = (long) TimeUtils.nanosToMillis(syncedSensorTimestampNs);
-    String filenameTimeString = syncedSensorTimestampMs + "_img";
-
-//    // Save timing metadata.
-//    {
-//      String metaFilename = "sync_metadata_" + filenameTimeString + ".txt";
-//      File metaFile = new File(captureDir, metaFilename);
-//      saveTimingMetadata(syncedSensorTimestampNs, localSensorTimestampNs, metaFile);
-//    }
+    String filenameTimeString = syncedSensorTimestampNs + "_img";
 
     for (int i = 0; i < frame.output.images.size(); ++i) {
       Image image = frame.output.images.get(i);
       int format = image.getFormat();
-//      if (format == ImageFormat.RAW_SENSOR) {
-//        // Note: while using DngCreator works, streaming RAW_SENSOR is too slow.
-//        Log.e(TAG, "RAW_SENSOR saving not implemented!");
-//      } else if (format == ImageFormat.JPEG) {
-//        Log.e(TAG, "JPEG saving not implemented!");
-//      } else if (format == ImageFormat.RAW10) {
-//        Log.e(TAG, "RAW10 saving not implemented!");
       if (format == ImageFormat.YUV_420_888) {
-//        // TODO(jiawen): We know that on Pixel devices, the YUV format is NV21, consisting of a luma
-//        // plane and separate interleaved chroma planes.
-//        //     <--w-->
-//        // ^   YYYYYYYZZZ
-//        // |   YYYYYYYZZZ
-//        // h   ...
-//        // |   ...
-//        // v   YYYYYYYZZZ
-//        //
-//        //     <--w-->
-//        // ^   VUVUVUVZZZZZ
-//        // |   VUVUVUVZZZZZ
-//        // h/2 ...
-//        // |   ...
-//        // v   VUVUVUVZZZZZ
-//        //
-//        // where Z is padding bytes.
-//        //
-//        // TODO(jiawen): To determine if it's NV12 vs NV21, we need JNI to compare the buffer start
-//        // addresses.
-//
-//        context.notifyCapturing("img_" + filenameTimeString);
-//
-        // Save NV21 raw + metadata.
-//        {
-//          File nv21File = new File(captureDir, "img_" + filenameTimeString + ".nv21");
-//          File nv21MetadataFile =
-//              new File(captureDir, "nv21_metadata_" + filenameTimeString + ".txt");
-//          saveNv21(image, nv21File, nv21MetadataFile);
-//          context.notifyCaptured(nv21File.getName());
-//        }
-
-//        // TODO(samansari): Make save JPEG a checkbox in the UI.
-//        if (saveJpgFromNv21) {
         YuvImage yuvImage = yuvImageFromNv21Image(image);
         File jpgFile = new File(captureDir, filenameTimeString + ".jpg");
 
@@ -149,7 +96,6 @@ public class ResultProcessor {
                   context.onStreamFrame(jpgFile, syncedSensorTimestampNs);
                 }
         );
-//        }
       } else {
         Log.e(TAG, String.format("Cannot save unsupported image format: %d", image.getFormat()));
       }
@@ -247,7 +193,6 @@ public class ResultProcessor {
       }
       long t1 = System.nanoTime();
       Log.i(TAG, String.format("Saving JPG to disk took %f ms.", (t1 - t0) * 1e-6f));
-      context.notifyCaptured(jpgFile.getName());
       return true;
     }
     return false;
@@ -259,14 +204,12 @@ public class ResultProcessor {
       Rect rect = new Rect(0, 0, src.getWidth(), src.getHeight());
       boolean ok = src.compressToJpeg(rect, quality, outputStream);
       if (!ok) {
-        // TODO(jiawen,samansari): Toast.
         Log.w(TAG, "Error saving JPEG to: " + file.getAbsolutePath());
       }
       long t1 = System.nanoTime();
       Log.i(TAG, String.format("saveJpg took %f ms.", (t1 - t0) * 1e-6f));
       return ok;
     } catch (IOException e) {
-      // TODO(jiawen,samansari): Toast.
       Log.w(TAG, "Error saving JPEG image to: " + file.getAbsolutePath());
       return false;
     }

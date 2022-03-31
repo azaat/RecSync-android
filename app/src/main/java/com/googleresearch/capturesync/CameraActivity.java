@@ -38,7 +38,6 @@ import android.hardware.camera2.CameraManager;
 import android.hardware.camera2.CaptureRequest;
 import android.hardware.camera2.params.StreamConfigurationMap;
 import android.media.CamcorderProfile;
-import android.media.Image;
 import android.media.MediaCodec;
 import android.media.MediaRecorder;
 import android.net.wifi.WifiManager;
@@ -69,9 +68,10 @@ import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
 import com.googleresearch.capturesync.softwaresync.phasealign.PhaseConfig;
 
+import org.json.JSONException;
+import org.json.JSONObject;
+
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -90,109 +90,40 @@ import java.util.Locale;
 import java.util.concurrent.FutureTask;
 import java.util.stream.Collectors;
 
-import org.json.JSONException;
-import org.json.JSONObject;
-
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class MainActivity extends Activity implements FrameInfo {
+public class CameraActivity extends Activity implements FrameInfo {
+    public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
     private static final int LATEST_FRAMES_CAP = 30;
-
-
-    public String getLastTimeStamp() {
-        return lastTimeStamp;
-    }
-
-    private String lastTimeStamp;
-    private PeriodCalculator periodCalculator;
-
-    public ArrayDeque<Long> getLatestFrames() {
-        return latestFrames;
-    }
-
-    public void displayStreamFrame(File streamFrame) {
-        Bitmap streamBitmap = BitmapFactory.decodeFile(streamFrame.getAbsolutePath());
-        runOnUiThread(
-                () -> {
-                    streamImageView.setImageBitmap(streamBitmap);
-                }
-        );
-    }
-
-    private ArrayDeque<Long> latestFrames;
-
-    public String getLastVideoPath() {
-        return lastVideoPath;
-    }
-
-    public void deleteUnusedVideo() {
-        String videoPath = getLastVideoPath();
-        File videoFile = new File(videoPath);
-        boolean result = videoFile.delete();
-        if (!result) {
-            Log.d(TAG, "Video file could not be deleted");
-        }
-    }
-
-    private String lastVideoPath;
-
-    public Integer getLastVideoSeqId() {
-        return lastVideoSeqId;
-    }
-
-    private Integer lastVideoSeqId;
-
-    public int getCurSequence() {
-        return curSequence;
-    }
-
-    public void setLogger(CSVLogger mLogger) {
-        this.mLogger = mLogger;
-    }
-
-    public CSVLogger getLogger() {
-        return mLogger;
-    }
-
-    private CSVLogger mLogger;
-
-    private int curSequence;
-
-    public static final String SUBDIR_NAME = "RecSync";
-
-    private boolean permissionsGranted = false;
-
     // Phase config file to use for phase alignment, configs are located in the raw folder.
     private final int phaseConfigFile = R.raw.default_phaseconfig;
-
-    public MediaRecorder getMediaRecorder() {
-        return mediaRecorder;
-    }
-
+    private String lastTimeStamp;
+    private PeriodCalculator periodCalculator;
+    private ArrayDeque<Long> latestFrames;
+    private String lastVideoPath;
+    private Integer lastVideoSeqId;
+    private CSVLogger mLogger;
+    private int curSequence;
+    private boolean permissionsGranted = false;
     private MediaRecorder mediaRecorder = new MediaRecorder();
     private boolean isVideoRecording = false;
-
     // Camera controls.
     private HandlerThread cameraThread;
     private Handler cameraHandler;
     private Handler send2aHandler;
     private CameraManager cameraManager;
-
     private String cameraId;
     private CameraDevice cameraDevice;
     private CameraCharacteristics cameraCharacteristics;
-
     // Cached camera characteristics.
     private Size viewfinderResolution;
     private Size rawImageResolution;
     private Size yuvImageResolution;
-
     // Top level UI windows.
     private int lastOrientation = Configuration.ORIENTATION_UNDEFINED;
-
     // UI controls.
     private Button captureStillButton;
     private Button getPeriodButton;
@@ -204,25 +135,24 @@ public class MainActivity extends Activity implements FrameInfo {
     private TextView sensorSensitivityTextView;
     private TextView softwaresyncStatusTextView;
     private TextView phaseTextView;
-
     // Local variables tracking current manual exposure and sensitivity values.
     private long currentSensorExposureTimeNs = seekBarValueToExposureNs(10);
     private int currentSensorSensitivity = seekBarValueToSensitivity(3);
-
     // High level camera controls.
     private CameraController cameraController;
     private CameraCaptureSession captureSession;
-
     /**
      * Manages SoftwareSync setup/teardown. Since softwaresync should only run when the camera is
      * running, it is instantiated in openCamera() and closed inside closeCamera().
      */
     private SoftwareSyncController softwareSyncController;
-
     private AutoFitSurfaceView surfaceView;
-
     private ImageView streamImageView;
-
+    private Surface viewfinderSurface;
+    private PhaseAlignController phaseAlignController;
+    private int numCaptures;
+    private Toast latestToast;
+    private Surface surface;
     private final SurfaceHolder.Callback surfaceCallback =
             new SurfaceHolder.Callback() {
 
@@ -243,12 +173,54 @@ public class MainActivity extends Activity implements FrameInfo {
                     Log.i(TAG, "destroyed.");
                 }
             };
-    private Surface viewfinderSurface;
-    private PhaseAlignController phaseAlignController;
-    private int numCaptures;
-    private Toast latestToast;
-    private Surface surface;
 
+    public String getLastTimeStamp() {
+        return lastTimeStamp;
+    }
+
+    public ArrayDeque<Long> getLatestFrames() {
+        return latestFrames;
+    }
+
+    public void displayStreamFrame(File streamFrame) {
+        Bitmap streamBitmap = BitmapFactory.decodeFile(streamFrame.getAbsolutePath());
+        runOnUiThread(
+                () -> streamImageView.setImageBitmap(streamBitmap)
+        );
+    }
+
+    public String getLastVideoPath() {
+        return lastVideoPath;
+    }
+
+    public void deleteUnusedVideo() {
+        String videoPath = getLastVideoPath();
+        File videoFile = new File(videoPath);
+        boolean result = videoFile.delete();
+        if (!result) {
+            Log.d(TAG, "Video file could not be deleted");
+        }
+    }
+
+    public Integer getLastVideoSeqId() {
+        return lastVideoSeqId;
+    }
+
+    public int getCurSequence() {
+        return curSequence;
+    }
+
+    public CSVLogger getLogger() {
+        return mLogger;
+    }
+
+    public void setLogger(CSVLogger mLogger) {
+        this.mLogger = mLogger;
+    }
+
+    public MediaRecorder getMediaRecorder() {
+        return mediaRecorder;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -258,8 +230,6 @@ public class MainActivity extends Activity implements FrameInfo {
         checkPermissions();
         if (permissionsGranted) {
             onCreateWithPermission();
-        } else {
-            // Wait for user to finish permissions before setting up the app.
         }
     }
 
@@ -269,7 +239,7 @@ public class MainActivity extends Activity implements FrameInfo {
 
         createUi();
         setupPhaseAlignController();
-        latestFrames = new ArrayDeque<Long>();
+        latestFrames = new ArrayDeque<>();
 
         // Query for camera characteristics and cache them.
         try {
@@ -434,7 +404,7 @@ public class MainActivity extends Activity implements FrameInfo {
                 view -> {
                     Log.d(TAG, "Calculating frames period.");
 
-                    FutureTask<Integer> periodTask = new FutureTask<Integer>(
+                    FutureTask<Integer> periodTask = new FutureTask<>(
                             () -> {
                                 try {
                                     long periodNs = periodCalculator.getPeriodNs();
@@ -485,31 +455,6 @@ public class MainActivity extends Activity implements FrameInfo {
                                             SoftwareSyncController.METHOD_START_RECORDING,
                                             "0");
                         }
-
-/*            if (cameraController.getOutputSurfaces().isEmpty()) {
-              Log.e(TAG, "No output surfaces found.");
-              Toast.makeText(this, R.string.error_msg_no_outputs, Toast.LENGTH_LONG).show();
-              return;
-            }
-
-            long currentTimestamp = softwareSyncController.softwareSync.getLeaderTimeNs();
-            // Trigger request some time in the future (~500ms for example) so all devices have time
-            // to receive the request (delayed due to network latency) and prepare for triggering.
-            // Note: If the user keeps a running circular buffer of images, they can select frames
-            // in the near past as well, allowing for 'instantaneous' captures on all devices.
-            long futureTimestamp = currentTimestamp + Constants.FUTURE_TRIGGER_DELAY_NS;
-
-            Log.d(
-                TAG,
-                String.format(
-                    "Trigger button, sending timestamp %,d at %,d",
-                    futureTimestamp, currentTimestamp));
-
-            // Broadcast desired synchronized capture time to all devices.
-            ((SoftwareSyncLeader) softwareSyncController.softwareSync)
-                .broadcastRpc(
-                    SoftwareSyncController.METHOD_SET_TRIGGER_TIME,
-                    String.valueOf(futureTimestamp));*/
                     });
 
             phaseAlignButton.setOnClickListener(
@@ -699,22 +644,10 @@ public class MainActivity extends Activity implements FrameInfo {
         } else {
             throw new IllegalStateException("Viewfinder unavailable!");
         }
-        // TODO: max
         viewfinderResolution =
                 Collections.max(viewfinderOutputSizes, new CompareSizesByArea());
 
-        Size[] rawOutputSizes = scm.getOutputSizes(ImageFormat.RAW10);
-//    if (rawOutputSizes != null) {
-//      Log.i(TAG, "Available Bayer RAW resolutions:");
-//      for (Size s : rawOutputSizes) {
-//        Log.i(TAG, s.toString());
-//      }
-//    } else {
-//      Log.i(TAG, "Bayer RAW unavailable!");
-//    }
-//    rawImageResolution = Collections.max(Arrays.asList(rawOutputSizes), new CompareSizesByArea());
-
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_HIGH);
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
         List<Size> yuvOutputSizes = Arrays.stream(scm.getOutputSizes(ImageFormat.YUV_420_888)).filter(
                 size -> size.getHeight() <= profile.videoFrameHeight && size.getWidth() <= profile.videoFrameWidth
         ).collect(Collectors.toList());
@@ -728,65 +661,7 @@ public class MainActivity extends Activity implements FrameInfo {
         }
         yuvImageResolution = Collections.max(yuvOutputSizes, new CompareSizesByArea());
         Log.i(TAG, "Chosen viewfinder resolution: " + viewfinderResolution);
-//    Log.i(TAG, "Chosen raw resolution: " + rawImageResolution);
         Log.i(TAG, "Chosen yuv resolution: " + yuvImageResolution);
-    }
-
-    public void setUpcomingCaptureStill(long upcomingTriggerTimeNs) {
-        cameraController.setUpcomingCaptureStill(upcomingTriggerTimeNs);
-        double timeTillSec =
-                TimeUtils.nanosToSeconds(
-                        (double)
-                                (upcomingTriggerTimeNs - softwareSyncController.softwareSync.getLeaderTimeNs()));
-        runOnUiThread(
-                () -> {
-                    if (latestToast != null) {
-                        latestToast.cancel();
-                    }
-                    latestToast =
-                            Toast.makeText(
-                                    this,
-                                    String.format("Capturing in %.2f seconds", timeTillSec),
-                                    Toast.LENGTH_SHORT);
-                    latestToast.show();
-                });
-    }
-
-    public void notifyCapturing(String name) {
-        runOnUiThread(
-                () -> {
-                    if (latestToast != null) {
-                        latestToast.cancel();
-                    }
-                    latestToast = Toast.makeText(this, "Capturing " + name + "...", Toast.LENGTH_SHORT);
-                    latestToast.show();
-                });
-    }
-
-    public void notifyCaptured(String name) {
-        numCaptures++;
-        runOnUiThread(
-                () -> {
-                    if (latestToast != null) {
-                        latestToast.cancel();
-                    }
-                    latestToast = Toast.makeText(this, "Captured " + name, Toast.LENGTH_LONG);
-                    latestToast.show();
-                    statusTextView.setText(String.format("%d captures", numCaptures));
-                });
-    }
-
-    /**
-     * Compares two {@code Size}s based on their areas.
-     */
-    static class CompareSizesByArea implements Comparator<Size> {
-
-        @Override
-        public int compare(Size lhs, Size rhs) {
-            // We cast here to ensure the multiplications won't overflow
-            return Long.signum(
-                    (long) lhs.getWidth() * lhs.getHeight() - (long) rhs.getWidth() * rhs.getHeight());
-        }
     }
 
     public void injectFrame(long desiredExposureTimeNs) {
@@ -1058,12 +933,12 @@ public class MainActivity extends Activity implements FrameInfo {
         return recorder;
     }
 
-    public void setVideoRecording(boolean videoRecording) {
-        isVideoRecording = videoRecording;
-    }
-
     public boolean isVideoRecording() {
         return isVideoRecording;
+    }
+
+    public void setVideoRecording(boolean videoRecording) {
+        isVideoRecording = videoRecording;
     }
 
     public void startVideo(boolean wantAutoExp) {
@@ -1185,5 +1060,18 @@ public class MainActivity extends Activity implements FrameInfo {
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+    /**
+     * Compares two {@code Size}s based on their areas.
+     */
+    static class CompareSizesByArea implements Comparator<Size> {
+
+        @Override
+        public int compare(Size lhs, Size rhs) {
+            // We cast here to ensure the multiplications won't overflow
+            return Long.signum(
+                    (long) lhs.getWidth() * lhs.getHeight() - (long) rhs.getWidth() * rhs.getHeight());
+        }
     }
 }

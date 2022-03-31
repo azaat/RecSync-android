@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 The Google Research Authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -40,7 +40,7 @@ public class PhaseAlignController {
     private static final int MAX_ITERATIONS = 50;
     // Delay after an alignment step to wait for phase to settle before starting the next iteration.
     private static final int PHASE_SETTLE_DELAY_MS = 400;
-    private final MainActivity context;
+    private final CameraActivity context;
 
     private final Handler handler;
     private final Object lock = new Object();
@@ -50,7 +50,7 @@ public class PhaseAlignController {
     private final PhaseConfig phaseConfig;
     private PhaseResponse latestResponse;
 
-    public PhaseAlignController(PhaseConfig config, MainActivity context) {
+    public PhaseAlignController(PhaseConfig config, CameraActivity context) {
         handler = new Handler();
         phaseConfig = config;
         phaseAligner = new PhaseAligner(config);

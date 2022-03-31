@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 The Google Research Authors.
  * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -41,7 +41,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import imagestreaming.FileTransferUtils;
+import com.azaat.smstereo.imagestreaming.FileTransferUtils;
 
 // Note : Needs Network permissions.
 
@@ -49,7 +49,7 @@ import imagestreaming.FileTransferUtils;
 public class SoftwareSyncController implements Closeable {
 
     private static final String TAG = "SoftwareSyncController";
-    private final MainActivity context;
+    private final CameraActivity context;
     private final TextView statusView;
     private final PhaseAlignController phaseAlignController;
     private boolean isLeader;
@@ -73,7 +73,7 @@ public class SoftwareSyncController implements Closeable {
      * TextView used to show currently connected clients on the leader device.
      */
     public SoftwareSyncController(
-            MainActivity context, PhaseAlignController phaseAlignController, TextView statusView) {
+            CameraActivity context, PhaseAlignController phaseAlignController, TextView statusView) {
         this.context = context;
         this.phaseAlignController = phaseAlignController;
         this.statusView = statusView;
@@ -135,15 +135,6 @@ public class SoftwareSyncController implements Closeable {
 
         // Set up shared rpcs.
         Map<Integer, RpcCallback> sharedRpcs = new HashMap<>();
-        sharedRpcs.put(
-                METHOD_SET_TRIGGER_TIME,
-                payload -> {
-                    Log.v(TAG, "Setting next trigger to" + payload);
-                    upcomingTriggerTimeNs = Long.valueOf(payload);
-                    // TODO: (MROB) change to video
-                    context.setUpcomingCaptureStill(upcomingTriggerTimeNs);
-                });
-
 
         sharedRpcs.put(
                 METHOD_DO_PHASE_ALIGN,

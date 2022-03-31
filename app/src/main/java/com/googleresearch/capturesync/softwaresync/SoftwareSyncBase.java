@@ -34,11 +34,9 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import imagestreaming.FileTransferUtils;
-import imagestreaming.BasicStreamClient;
-import imagestreaming.BasicStreamServer;
-import imagestreaming.StreamClient;
-import imagestreaming.StreamServer;
+import com.azaat.smstereo.imagestreaming.FileTransferUtils;
+import com.azaat.smstereo.imagestreaming.StreamClient;
+import com.azaat.smstereo.imagestreaming.StreamServer;
 
 /**
  * SoftwareSyncBase is the abstract base class to SoftwareSyncLeader and SoftwareSyncClient, holding

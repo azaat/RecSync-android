@@ -1,9 +1,8 @@
-package imagestreaming;
+package com.azaat.smstereo.imagestreaming
 
-import java.io.File;
+import java.io.File
 
-public abstract class StreamClient {
-    public abstract void onVideoFrame(File frame, long timestampNs);
-
-    public abstract void closeConnection();
+abstract class StreamClient {
+    abstract fun onVideoFrame(frame: File, timestampNs: Long)
+    abstract fun closeConnection()
 }

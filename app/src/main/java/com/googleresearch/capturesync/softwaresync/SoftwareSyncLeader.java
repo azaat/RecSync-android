@@ -1,4 +1,4 @@
-/**
+/*
  * Copyright 2019 The Google Research Authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,7 +18,6 @@ package com.googleresearch.capturesync.softwaresync;
 
 import android.util.Log;
 
-import com.googleresearch.capturesync.Frame;
 import com.googleresearch.capturesync.FrameInfo;
 
 import java.io.IOException;
@@ -36,8 +35,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import imagestreaming.FileTransferUtils;
-import imagestreaming.BasicStreamServer;
+import com.azaat.smstereo.imagestreaming.FileTransferUtils;
+import com.azaat.smstereo.imagestreaming.BasicStreamServer;
 
 /**
  * Leader which listens for registrations from SoftwareSyncClients, allowing it to broadcast times
@@ -115,7 +114,7 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     staleClientChecker.scheduleAtFixedRate(
         this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-    setStreamServer(new BasicStreamServer(fileUtils, frameInfo));
+    setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this));
     getStreamServer().start();
   }
 

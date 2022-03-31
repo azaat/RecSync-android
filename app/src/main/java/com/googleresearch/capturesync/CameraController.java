@@ -101,7 +101,7 @@ public class CameraController {
           Size rawImageResolution,
           Size yuvImageResolution,
           PhaseAlignController phaseAlignController,
-          MainActivity context,
+          CameraActivity context,
           TimeDomainConverter timeDomainConverter,
           PhaseConfig phaseConfig
           ) {
@@ -189,18 +189,18 @@ public class CameraController {
             syncHandler);
   }
 
-  public void prepareFrameSaving(MainActivity context) {
+  public void prepareFrameSaving(CameraActivity context) {
     // should be called when new video is started
     File sdcard = Environment.getExternalStorageDirectory();
     try {
-      outputDir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), MainActivity.SUBDIR_NAME, context.getLastTimeStamp()));
+      outputDir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), CameraActivity.SUBDIR_NAME, context.getLastTimeStamp()));
     } catch (IOException e) {
       e.printStackTrace();
     }
     Toast.makeText(context, "Prepared for saving frames", Toast.LENGTH_SHORT).show();
   }
 
-  public void stopFrameSaving(MainActivity context) {
+  public void stopFrameSaving(CameraActivity context) {
     outputDir = null;
   }
 
