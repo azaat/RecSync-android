@@ -43,7 +43,7 @@ class BasicStreamClient
     }
 
     companion object {
-        const val TAG = "StreamClient"
+        const val TAG = "BasicStreamClient"
         const val PORT = 6969
     }
 }
