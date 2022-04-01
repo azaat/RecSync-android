@@ -18,6 +18,7 @@ package com.googleresearch.capturesync.softwaresync;
 
 import android.util.Log;
 
+import com.azaat.smstereo.StereoController;
 import com.googleresearch.capturesync.FrameInfo;
 
 import java.io.IOException;
@@ -64,6 +65,12 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
 
   /** Manages SNTP synchronization of clients. */
   private final SimpleNetworkTimeProtocol sntp;
+
+  public StereoController getStereoController() {
+    return stereoController;
+  }
+
+  private final StereoController stereoController;
 
   public SoftwareSyncLeader(
           String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, FrameInfo frameInfo) {
@@ -114,7 +121,8 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     staleClientChecker.scheduleAtFixedRate(
         this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-    setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this));
+    stereoController = new StereoController();
+    setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this, stereoController));
     getStreamServer().start();
   }
 

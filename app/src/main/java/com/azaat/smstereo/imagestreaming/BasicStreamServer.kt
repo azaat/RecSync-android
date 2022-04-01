@@ -2,6 +2,7 @@ package com.azaat.smstereo.imagestreaming
 
 import android.os.Environment
 import android.util.Log
+import com.azaat.smstereo.StereoController
 import com.googleresearch.capturesync.CameraActivity
 import com.googleresearch.capturesync.FrameInfo
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
@@ -17,13 +18,13 @@ import java.nio.file.Paths
 class BasicStreamServer(
     private val utils: FileTransferUtils,
     private val frameInfo: FrameInfo,
-    private val timeDomainConverter: SoftwareSyncBase
+    private val timeDomainConverter: SoftwareSyncBase,
+    private val stereoController: StereoController
 ) : StreamServer() {
-
     @Volatile
     override var isExecuting = false
         private set
-    private val imageMatcher: ImageMatcher = ImageMatcher(frameInfo)
+    private val imageMatcher: ImageMatcher = ImageMatcher(frameInfo, stereoController)
     override fun run() {
         isExecuting = true
         Log.d(TAG, "waiting to accept connection from client...")
@@ -68,8 +69,8 @@ class BasicStreamServer(
     }
 
     companion object {
-        const val TAG = "StreamServer"
-        private const val SOCKET_WAIT_TIME_MS = 1000
+        const val TAG = "BasicStreamServer"
+        private const val SOCKET_WAIT_TIME_MS = 10000
         private const val PORT = 6969
         private const val tmpPath = "clientFrames"
     }

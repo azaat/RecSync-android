@@ -128,6 +128,7 @@ public class CameraActivity extends Activity implements FrameInfo {
     private ImageButton recordButton;
     private Button getPeriodButton;
     private Button phaseAlignButton;
+    private Button calibrateButton;
     private SeekBar exposureSeekBar;
     private SeekBar sensitivitySeekBar;
     private TextView statusTextView;
@@ -439,9 +440,10 @@ public class CameraActivity extends Activity implements FrameInfo {
             // Leader, all controls visible and set.
             recordButton.setVisibility(View.VISIBLE);
             phaseAlignButton.setVisibility(View.VISIBLE);
-            getPeriodButton.setVisibility(View.VISIBLE);
+            getPeriodButton.setVisibility(View.INVISIBLE);
             exposureSeekBar.setVisibility(View.VISIBLE);
             sensitivitySeekBar.setVisibility(View.VISIBLE);
+            calibrateButton.setVisibility(View.VISIBLE);
 
             recordButton.setOnClickListener(
                     view -> {
@@ -469,6 +471,14 @@ public class CameraActivity extends Activity implements FrameInfo {
                         ((SoftwareSyncLeader) softwareSyncController.softwareSync)
                                 .broadcastRpc(SoftwareSyncController.METHOD_DO_PHASE_ALIGN, "");
                     });
+
+            calibrateButton.setOnClickListener(
+                    view -> {
+                        SoftwareSyncLeader softwareSyncLeader = ((SoftwareSyncLeader) softwareSyncController.softwareSync);
+                        // TODO: how to set up interaction (StereoController <-> UI in Activity) correctly?
+                        softwareSyncLeader.getStereoController().runStereoCalibration();
+                    }
+            );
 
             exposureSeekBar.setOnSeekBarChangeListener(
                     new OnSeekBarChangeListener() {
@@ -532,7 +542,7 @@ public class CameraActivity extends Activity implements FrameInfo {
             // Client. All controls invisible.
             recordButton.setVisibility(View.INVISIBLE);
             phaseAlignButton.setVisibility(View.INVISIBLE);
-            getPeriodButton.setVisibility(View.VISIBLE);
+            getPeriodButton.setVisibility(View.INVISIBLE);
             exposureSeekBar.setVisibility(View.INVISIBLE);
             sensitivitySeekBar.setVisibility(View.INVISIBLE);
 
@@ -705,6 +715,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         recordButton = findViewById(R.id.record_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
+        calibrateButton = findViewById(R.id.calibrate_button);
 
         exposureSeekBar = findViewById(R.id.exposure_seekbar);
         sensitivitySeekBar = findViewById(R.id.sensitivity_seekbar);

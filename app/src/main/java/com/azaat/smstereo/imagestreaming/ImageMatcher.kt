@@ -1,11 +1,12 @@
 package com.azaat.smstereo.imagestreaming
 
 import android.util.Log
+import com.azaat.smstereo.ImagePairAvailableListener
 import com.googleresearch.capturesync.FrameInfo
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.File
 
-class ImageMatcher(private val frameInfo: FrameInfo) {
+class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvailableListener: ImagePairAvailableListener) {
     fun onClientImageAvailable(clientFrame: File, timeDomainConverter: SoftwareSyncBase) {
         // takes client frame with timestamp, finds a leader frame with a matching timestamp
         val timestamp =
@@ -24,6 +25,8 @@ class ImageMatcher(private val frameInfo: FrameInfo) {
                 Log.d(TAG, "Found match for the client frame: $matchingTimestamp $timestamp")
                 val delay = timestamp - timeDomainConverter.leaderTimeNs
                 Log.d(TAG, "Delay: $delay")
+
+                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingTimestamp)
             } else {
                 Log.d(TAG, "Match not found")
                 Log.d(TAG, "Client: $timestamp")
@@ -31,8 +34,7 @@ class ImageMatcher(private val frameInfo: FrameInfo) {
             }
         }
 
-        frameInfo.displayStreamFrame(clientFrame)
-        // reports image pair to the depth estimator?
+        frameInfo.displayStreamFrame(clientFrame);
     }
 
     companion object {
