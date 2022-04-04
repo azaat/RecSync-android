@@ -29,6 +29,7 @@ import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
+import android.graphics.YuvImage;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -97,15 +98,21 @@ public class CameraActivity extends Activity implements FrameInfo {
     public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
-    private static final int LATEST_FRAMES_CAP = 30;
+    public static final int LATEST_FRAMES_CAP = 5;
     // Phase config file to use for phase alignment, configs are located in the raw folder.
     private final int phaseConfigFile = R.raw.default_phaseconfig;
     private String lastTimeStamp;
     private PeriodCalculator periodCalculator;
-    private ArrayDeque<Long> latestFrames;
+    private ArrayDeque<SynchronizedFrame> latestFrames;
     private String lastVideoPath;
     private Integer lastVideoSeqId;
     private CSVLogger mLogger;
+
+    public YuvImageUtils getYuvImageUtils() {
+        return yuvImageUtils;
+    }
+
+    private YuvImageUtils yuvImageUtils;
     private int curSequence;
     private boolean permissionsGranted = false;
     private MediaRecorder mediaRecorder = new MediaRecorder();
@@ -179,14 +186,13 @@ public class CameraActivity extends Activity implements FrameInfo {
         return lastTimeStamp;
     }
 
-    public ArrayDeque<Long> getLatestFrames() {
+    public ArrayDeque<SynchronizedFrame> getLatestFrames() {
         return latestFrames;
     }
 
-    public void displayStreamFrame(File streamFrame) {
-        Bitmap streamBitmap = BitmapFactory.decodeFile(streamFrame.getAbsolutePath());
+    public void displayStreamFrame(SynchronizedFrame streamFrame) {
         runOnUiThread(
-                () -> streamImageView.setImageBitmap(streamBitmap)
+                () -> streamImageView.setImageBitmap(streamFrame.getBitmap())
         );
     }
 
@@ -244,7 +250,7 @@ public class CameraActivity extends Activity implements FrameInfo {
 
         createUi();
         setupPhaseAlignController();
-        latestFrames = new ArrayDeque<>();
+        latestFrames = new ArrayDeque<SynchronizedFrame>();
 
         // Query for camera characteristics and cache them.
         try {
@@ -258,7 +264,7 @@ public class CameraActivity extends Activity implements FrameInfo {
 
         // Set the aspect ratio now that we know the viewfinder resolution.
         surfaceView.setAspectRatio(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
-
+        yuvImageUtils = new YuvImageUtils(this);
         // Process the initial configuration (for i.e. initial orientation)
         // We need this because #onConfigurationChanged doesn't get called when
         // the app launches
@@ -577,14 +583,14 @@ public class CameraActivity extends Activity implements FrameInfo {
         return softwareSyncController.isLeader();
     }
 
-    public void onStreamFrame(File jpegFile, long timestampNs) {
+    public void onStreamFrame(Bitmap bitmap, long timestampNs) {
         if (!isLeader()) {
             SoftwareSyncClient softwareSyncClient = (SoftwareSyncClient) softwareSyncController.softwareSync;
-            softwareSyncClient.getStreamClient().onVideoFrame(jpegFile, timestampNs);
+            softwareSyncClient.getStreamClient().onVideoFrame(new SynchronizedFrame(bitmap, timestampNs));
         } else {
-            Long timestamp = Long.parseLong(jpegFile.getName().split("_", -1)[0]);
-            latestFrames.add(timestamp);
+            latestFrames.add(new SynchronizedFrame(bitmap, timestampNs));
             if (latestFrames.size() > LATEST_FRAMES_CAP) {
+                latestFrames.getFirst().close();
                 latestFrames.removeFirst();
             }
         }

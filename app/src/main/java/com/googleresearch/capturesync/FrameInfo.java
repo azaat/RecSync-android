@@ -4,9 +4,9 @@ import java.io.File;
 import java.util.ArrayDeque;
 
 public interface FrameInfo {
-    public ArrayDeque<Long> getLatestFrames();
+    public ArrayDeque<SynchronizedFrame> getLatestFrames();
 
-    public void displayStreamFrame(File streamFrame);
+    public void displayStreamFrame(SynchronizedFrame streamFrame);
 
     public File getExternalDir();
 }

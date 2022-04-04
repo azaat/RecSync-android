@@ -1,9 +1,9 @@
 package com.azaat.smstereo.imagestreaming
 
-import android.os.Environment
 import android.util.Log
 import com.azaat.smstereo.StereoController
 import com.googleresearch.capturesync.CameraActivity
+import com.googleresearch.capturesync.Frame
 import com.googleresearch.capturesync.FrameInfo
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
@@ -24,6 +24,10 @@ class BasicStreamServer(
     @Volatile
     override var isExecuting = false
         private set
+
+    var latestFramesBuffer: ArrayDeque<Frame> = ArrayDeque()
+        private set
+
     private val imageMatcher: ImageMatcher = ImageMatcher(frameInfo, stereoController)
     override fun run() {
         isExecuting = true
@@ -47,7 +51,7 @@ class BasicStreamServer(
                             Log.d(TAG, "accepted connection from client")
 
                             // receive frame
-                            val clientFrame = utils.receiveFile(outputDir.toString(), clientSocket)
+                            val clientFrame = utils.receiveBuffer(clientSocket)
                             Log.d(TAG, "File received")
                             imageMatcher.onClientImageAvailable(clientFrame, timeDomainConverter)
                         }
@@ -58,6 +62,15 @@ class BasicStreamServer(
             }
         } catch (e: IOException) {
             e.printStackTrace()
+        }
+    }
+
+    fun onStreamFrame(streamFrame: Frame) {
+        // save frame to ram buffer
+
+        latestFramesBuffer.add(streamFrame)
+        if (latestFramesBuffer.size > CameraActivity.LATEST_FRAMES_CAP) {
+            latestFramesBuffer.removeFirst()
         }
     }
 

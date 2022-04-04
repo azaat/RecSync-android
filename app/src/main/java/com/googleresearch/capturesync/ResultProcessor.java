@@ -18,15 +18,24 @@ package com.googleresearch.capturesync;
 
 import static java.nio.charset.StandardCharsets.UTF_8;
 
+import android.graphics.Bitmap;
 import android.graphics.ImageFormat;
 import android.graphics.Rect;
 import android.graphics.YuvImage;
 import android.hardware.camera2.CaptureResult;
 import android.media.Image;
+import android.os.Build;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.provider.MediaStore;
+import android.renderscript.Allocation;
+import android.renderscript.Element;
+import android.renderscript.RenderScript;
+import android.renderscript.ScriptIntrinsicYuvToRGB;
 import android.util.Log;
+
+import androidx.annotation.RequiresApi;
+
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
 
 import java.io.File;
@@ -46,7 +55,8 @@ public class ResultProcessor {
   private final Handler handler;
   private final CameraActivity context;
   private final TimeDomainConverter timeDomainConverter;
-
+  private final RenderScript mRenderScript;
+  private final ScriptIntrinsicYuvToRGB mYuvToRgb;
   private final int jpgQuality;
 
   public ResultProcessor(
@@ -63,6 +73,8 @@ public class ResultProcessor {
     thread.start();
     // getLooper() blocks until the thread started and its Looper is prepared.
     handler = new Handler(thread.getLooper());
+    mRenderScript = RenderScript.create(context);
+    mYuvToRgb = ScriptIntrinsicYuvToRGB.create(mRenderScript, Element.U8_4(mRenderScript));
   }
 
   /** Submit a request to process a Frame on the processor's thread. */
@@ -86,14 +98,19 @@ public class ResultProcessor {
       Image image = frame.output.images.get(i);
       int format = image.getFormat();
       if (format == ImageFormat.YUV_420_888) {
-        YuvImage yuvImage = yuvImageFromNv21Image(image);
-        File jpgFile = new File(captureDir, filenameTimeString + ".jpg");
 
+        int imageWidth = image.getWidth();
+        int imageHeight = image.getHeight();
+        byte[] nv21 = Yuv420ImageToNv21(image);
+//        YuvImage yuvImage = yuvImageFromNv21Image(image);
+
+        File jpgFile = new File(captureDir, filenameTimeString + ".jpg");
         // Push saving JPEG onto queue to let the frame close faster, necessary for some devices.
         handler.post(
                 () -> {
-                  saveJpg(yuvImage, jpgFile);
-                  context.onStreamFrame(jpgFile, syncedSensorTimestampNs);
+                  Bitmap bitmap = yuv420ToBitmap(nv21, imageWidth, imageHeight);
+                  context.onStreamFrame(bitmap, syncedSensorTimestampNs);
+//                  saveJpg(yuvImage, jpgFile);
                 }
         );
       } else {
@@ -102,6 +119,83 @@ public class ResultProcessor {
     }
 
     frame.close();
+  }
+
+  /**
+   * Converts byte array with NV21 data to Bitmap using yuvToRgb Renderscript intrinsic
+   */
+  public Bitmap yuv420ToBitmap(byte[] imageData, int width, int height) {
+    Allocation aIn = Allocation.createSized(mRenderScript, Element.U8(mRenderScript), imageData.length, Allocation.USAGE_SCRIPT);
+    Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
+    Allocation aOut = Allocation.createFromBitmap(mRenderScript, bitmap);
+    aIn.copyFrom(imageData);
+    mYuvToRgb.setInput(aIn);
+    mYuvToRgb.forEach(aOut);
+    aOut.copyTo(bitmap);
+    aOut.destroy();
+    aIn.destroy();
+
+    return bitmap;
+  }
+
+  // Method taken from this answer:
+  // https://stackoverflow.com/questions/44022062/converting-yuv-420-888-to-jpeg-and-saving-file-results-distorted-image
+  @RequiresApi(api = Build.VERSION_CODES.LOLLIPOP)
+  public static byte[] Yuv420ImageToNv21(Image image) {
+    Rect crop = image.getCropRect();
+    int format = image.getFormat();
+    int width = crop.width();
+    int height = crop.height();
+    Image.Plane[] planes = image.getPlanes();
+    byte[] data = new byte[width * height * ImageFormat.getBitsPerPixel(format) / 8];
+    byte[] rowData = new byte[planes[0].getRowStride()];
+
+    int channelOffset = 0;
+    int outputStride = 1;
+    for (int i = 0; i < planes.length; i++) {
+      switch (i) {
+        case 0:
+          channelOffset = 0;
+          outputStride = 1;
+          break;
+        case 1:
+          channelOffset = width * height + 1;
+          outputStride = 2;
+          break;
+        case 2:
+          channelOffset = width * height;
+          outputStride = 2;
+          break;
+      }
+
+      ByteBuffer buffer = planes[i].getBuffer();
+      int rowStride = planes[i].getRowStride();
+      int pixelStride = planes[i].getPixelStride();
+
+      int shift = (i == 0) ? 0 : 1;
+      int w = width >> shift;
+      int h = height >> shift;
+      buffer.position(rowStride * (crop.top >> shift) + pixelStride * (crop.left >> shift));
+      for (int row = 0; row < h; row++) {
+        int length;
+        if (pixelStride == 1 && outputStride == 1) {
+          length = w;
+          buffer.get(data, channelOffset, length);
+          channelOffset += length;
+        } else {
+          length = (w - 1) * pixelStride + 1;
+          buffer.get(rowData, 0, length);
+          for (int col = 0; col < w; col++) {
+            data[channelOffset] = rowData[col * pixelStride];
+            channelOffset += outputStride;
+          }
+        }
+        if (row < h - 1) {
+          buffer.position(buffer.position() + rowStride - length);
+        }
+      }
+    }
+    return data;
   }
 
   private static boolean saveNv21(Image yuvImage, File nv21File, File nv21metadataFile) {
