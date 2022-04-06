@@ -14,8 +14,7 @@ import java.util.concurrent.Executors
  * A basic streaming client implementation sending images
  * over sockets
  */
-class BasicStreamClient
-    (private var address: InetAddress, var utils: FileTransferUtils) : StreamClient() {
+class BasicStreamClient(private var address: InetAddress, var utils: FileTransferUtils) : StreamClient() {
     private val frameProcessor = Executors.newSingleThreadExecutor()
     lateinit var clientSocket: Socket
     override fun onVideoFrame(frame: SynchronizedFrame) {
