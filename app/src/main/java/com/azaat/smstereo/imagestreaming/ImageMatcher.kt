@@ -12,29 +12,32 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
         // takes client frame with timestamp, finds a leader frame with a matching timestamp
         val timestamp = clientFrame.timestampNs
         val latestFrames = frameInfo.latestFrames
-        if (!latestFrames.isEmpty()) {
-            val matchingFrame = latestFrames.stream()
-                .filter { leaderFrame: SynchronizedFrame -> leaderFrame.timestampNs - timestamp < MATCHING_THRESHOLD }
-                .min(Comparator.comparingLong { leaderFrame: SynchronizedFrame ->
-                    Math.abs(
-                        leaderFrame.timestampNs - timestamp
-                    )
-                }
-                ).orElse(null)
-            if (matchingFrame != null) {
-                Log.d(TAG, "Found match for the client frame: ${matchingFrame.timestampNs} $timestamp")
-                val delay = timestamp - timeDomainConverter.leaderTimeNs
-                Log.d(TAG, "Delay: $delay")
-
-                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs)
-            } else {
-                Log.d(TAG, "Match not found")
-                Log.d(TAG, "Client: $timestamp")
-                Log.d(TAG, "Leader ts: $latestFrames")
-            }
+        if (latestFrames.isEmpty()) {
+            return
         }
 
-        frameInfo.displayStreamFrame(clientFrame);
+        val matchingFrame = latestFrames.stream()
+            .filter { leaderFrame: SynchronizedFrame -> leaderFrame.timestampNs - timestamp < MATCHING_THRESHOLD }
+            .min(Comparator.comparingLong { leaderFrame: SynchronizedFrame ->
+                Math.abs(
+                    leaderFrame.timestampNs - timestamp
+                )
+            }
+            ).orElse(null)
+        if (matchingFrame != null) {
+            Log.d(TAG, "Found match for the client frame: ${matchingFrame.timestampNs} $timestamp")
+            val delay = timestamp - timeDomainConverter.leaderTimeNs
+            Log.d(TAG, "Delay: $delay")
+
+            imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs)
+        } else {
+            Log.d(TAG, "Match not found")
+            Log.d(TAG, "Client: $timestamp")
+            Log.d(TAG, "Leader ts: $latestFrames")
+        }
+
+
+        frameInfo.displayStreamFrame(clientFrame)
     }
 
     companion object {
