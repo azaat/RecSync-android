@@ -17,9 +17,9 @@ import java.nio.file.Paths
  */
 class BasicStreamServer(
     private val utils: FileTransferUtils,
-    private val frameInfo: FrameInfo,
+    frameInfo: FrameInfo,
     private val timeDomainConverter: SoftwareSyncBase,
-    private val stereoController: StereoController
+    stereoController: StereoController
 ) : StreamServer() {
     @Volatile
     override var isExecuting = false
@@ -34,14 +34,6 @@ class BasicStreamServer(
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = frameInfo.externalDir
-                val outputDir = Files.createDirectories(
-                    Paths.get(
-                        sdcard.absolutePath,
-                        CameraActivity.SUBDIR_NAME,
-                        tmpPath
-                    )
-                )
                 rpcSocket.reuseAddress = true
                 rpcSocket.soTimeout = SOCKET_WAIT_TIME_MS
                 while (isExecuting) {
