@@ -15,10 +15,11 @@ import java.util.concurrent.Executors
  * over sockets
  */
 class BasicStreamClient
-    (private var address: InetAddress, var utils: FileTransferUtils) : StreamClient() {
+    (private var address: InetAddress, var utils: FileTransferUtils) : BasicStream() {
     private val frameProcessor = Executors.newSingleThreadExecutor()
     lateinit var clientSocket: Socket
-    override fun onVideoFrame(frame: SynchronizedFrame) {
+
+    override fun onStreamImageAvailable(frame: SynchronizedFrame) {
         // send frame over the channel
         if (!frameProcessor.isShutdown) {
             frameProcessor.execute {

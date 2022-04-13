@@ -23,6 +23,7 @@ import android.provider.Settings.Secure;
 import android.util.Log;
 import android.widget.TextView;
 
+import com.azaat.smstereo.imagestreaming.BasicStream;
 import com.googleresearch.capturesync.softwaresync.ClientInfo;
 import com.googleresearch.capturesync.softwaresync.NetworkHelpers;
 import com.googleresearch.capturesync.softwaresync.RpcCallback;
@@ -53,7 +54,12 @@ public class SoftwareSyncController implements Closeable {
     private final TextView statusView;
     private final PhaseAlignController phaseAlignController;
     private boolean isLeader;
-    SoftwareSyncBase softwareSync;
+
+    protected SoftwareSyncBase softwareSync;
+
+    public BasicStream getBasicStream() {
+        return softwareSync.getBasicStream();
+    }
 
     /* Tell devices to save the frame at the requested trigger time. */
     public static final int METHOD_SET_TRIGGER_TIME = 200_000;
@@ -169,7 +175,7 @@ public class SoftwareSyncController implements Closeable {
             leaderRpcs.put(SyncConstants.METHOD_MSG_REMOVED_CLIENT, payload -> updateClientsUI());
             leaderRpcs.put(SyncConstants.METHOD_MSG_SYNCING, payload -> updateClientsUI());
             leaderRpcs.put(SyncConstants.METHOD_MSG_OFFSET_UPDATED, payload -> updateClientsUI());
-            softwareSync = new SoftwareSyncLeader(name, initTimeNs, localAddress, leaderRpcs, fileUtils, context, context.getStereoController());
+            softwareSync = new SoftwareSyncLeader(name, initTimeNs, localAddress, leaderRpcs, fileUtils, context.getStereoController());
         } else {
             // Client.
             Map<Integer, RpcCallback> clientRpcs = new HashMap<>(sharedRpcs);

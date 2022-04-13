@@ -1,7 +1,5 @@
 package com.googleresearch.capturesync.softwaresync;
 
-import android.os.Environment;
-
 import com.googleresearch.capturesync.CameraActivity;
 
 import java.io.BufferedWriter;

@@ -2,6 +2,7 @@ package com.azaat.smstereo
 
 import android.util.Log
 import com.googleresearch.capturesync.CameraView
+import com.googleresearch.capturesync.SoftwareSyncController
 import com.googleresearch.capturesync.SynchronizedFrame
 import java.io.File
 import java.util.*
@@ -10,14 +11,15 @@ import java.util.*
  * Should be instantiated only on leader;
  * handles events associated with stereo processing
  */
-class StereoController (private val cameraView: CameraView) : ImagePairAvailableListener{
+class StereoController (
+        private val cameraView: CameraView,
+        private val softwareSyncController: SoftwareSyncController
+        ) : OnImagePairAvailableListener, OnStreamImageAvailableListener by softwareSyncController.basicStream {
     /**
      * TODO: modifications in UI based on the state of StereoController?
      */
     var stereoControllerState = StereoControllerStates.UNCALIBRATED
         private set
-
-    private val latestFrames: ArrayDeque<SynchronizedFrame> = ArrayDeque()
 
     /**
      * Records a stereo sequence, processes recorded frames

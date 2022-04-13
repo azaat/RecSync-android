@@ -21,7 +21,6 @@ import android.util.Log;
 import com.azaat.smstereo.StereoController;
 import com.azaat.smstereo.imagestreaming.BasicStreamServer;
 import com.azaat.smstereo.imagestreaming.FileTransferUtils;
-import com.googleresearch.capturesync.FrameInfo;
 
 import java.io.IOException;
 import java.net.InetAddress;
@@ -75,8 +74,8 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     private final StereoController stereoController;
 
     public SoftwareSyncLeader(
-            String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, FrameInfo frameInfo, StereoController stereoController) {
-        this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, frameInfo, stereoController);
+            String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, StereoController stereoController) {
+        this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, stereoController);
     }
 
     @SuppressWarnings("FutureReturnValueIgnored")
@@ -87,7 +86,6 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
             InetAddress address,
             Map<Integer, RpcCallback> rpcCallbacks,
             FileTransferUtils fileUtils,
-            FrameInfo frameInfo,
             StereoController stereoController) {
         // Note: Leader address is required to be the same as local address.
         super(name, localClock, address, address, fileUtils);
@@ -125,8 +123,8 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
         staleClientChecker.scheduleAtFixedRate(
                 this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-        setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this, stereoController));
-        getStreamServer().start();
+        setBasicStream(new BasicStreamServer(fileUtils, this, stereoController));
+        getBasicStream().start();
     }
 
     public StereoController getStereoController() {
@@ -255,7 +253,7 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     public void close() throws IOException {
         sntp.close();
         staleClientChecker.shutdown();
-        getStreamServer().stopExecuting();
+        getBasicStream().closeConnection();
         try {
             // Wait up to 0.5 seconds for this to close.
             staleClientChecker.awaitTermination(500, TimeUnit.MILLISECONDS);

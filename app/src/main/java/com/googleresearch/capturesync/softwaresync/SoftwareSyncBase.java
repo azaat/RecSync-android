@@ -34,9 +34,8 @@ import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
+import com.azaat.smstereo.imagestreaming.BasicStream;
 import com.azaat.smstereo.imagestreaming.FileTransferUtils;
-import com.azaat.smstereo.imagestreaming.StreamClient;
-import com.azaat.smstereo.imagestreaming.StreamServer;
 
 /**
  * SoftwareSyncBase is the abstract base class to SoftwareSyncLeader and SoftwareSyncClient, holding
@@ -69,24 +68,15 @@ public abstract class SoftwareSyncBase implements Closeable, TimeDomainConverter
   /** Handle onRPC events on a separate thread. */
   private final ExecutorService rpcExecutor = Executors.newSingleThreadExecutor();
 
-  public StreamClient getStreamClient() {
-    return streamClient;
+  public BasicStream getBasicStream() {
+    return basicStream;
   }
 
-  public void setStreamClient(StreamClient streamClient) {
-    this.streamClient = streamClient;
+  public void setBasicStream(BasicStream basicStream) {
+    this.basicStream = basicStream;
   }
 
-  public StreamServer getStreamServer() {
-    return streamServer;
-  }
-
-  public void setStreamServer(StreamServer streamServer) {
-    this.streamServer = streamServer;
-  }
-
-  private StreamClient streamClient;
-  private StreamServer streamServer;
+  private BasicStream basicStream;
 
 
   SoftwareSyncBase(String name, Ticker localClock, InetAddress address, InetAddress leaderAddress, FileTransferUtils fileUtils) {

@@ -24,12 +24,9 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.content.res.Configuration;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.graphics.ImageFormat;
 import android.graphics.Point;
 import android.graphics.SurfaceTexture;
-import android.graphics.YuvImage;
 import android.hardware.camera2.CameraAccessException;
 import android.hardware.camera2.CameraCaptureSession;
 import android.hardware.camera2.CameraCharacteristics;
@@ -64,7 +61,6 @@ import android.widget.Toast;
 
 import com.azaat.smstereo.StereoController;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
-import com.googleresearch.capturesync.softwaresync.SoftwareSyncClient;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
 import com.googleresearch.capturesync.softwaresync.TimeUtils;
 import com.googleresearch.capturesync.softwaresync.phasealign.PeriodCalculator;
@@ -95,7 +91,7 @@ import java.util.stream.Collectors;
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class CameraActivity extends Activity implements FrameInfo, CameraView {
+public class CameraActivity extends Activity implements CameraView {
     public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
@@ -272,7 +268,7 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
         // Set the aspect ratio now that we know the viewfinder resolution.
         surfaceView.setAspectRatio(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
         yuvImageUtils = new YuvImageUtils(this);
-        stereoController = new StereoController(this);
+        stereoController = new StereoController(this, softwareSyncController);
         // Process the initial configuration (for i.e. initial orientation)
         // We need this because #onConfigurationChanged doesn't get called when
         // the app launches
@@ -589,18 +585,18 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
         return softwareSyncController.isLeader();
     }
 
-    public void onStreamFrame(Bitmap bitmap, long timestampNs) {
-        if (!isLeader()) {
-            SoftwareSyncClient softwareSyncClient = (SoftwareSyncClient) softwareSyncController.softwareSync;
-            softwareSyncClient.getStreamClient().onVideoFrame(new SynchronizedFrame(bitmap, timestampNs));
-        } else {
-            latestFrames.add(new SynchronizedFrame(bitmap, timestampNs));
-            if (latestFrames.size() > LATEST_FRAMES_CAP) {
-                latestFrames.getFirst().close();
-                latestFrames.removeFirst();
-            }
-        }
-    }
+//    public void onStreamFrame(Bitmap bitmap, long timestampNs) {
+//        if (!isLeader()) {
+//            SoftwareSyncClient softwareSyncClient = (SoftwareSyncClient) softwareSyncController.softwareSync;
+//            softwareSyncClient.getStreamClient().onVideoFrame(new SynchronizedFrame(bitmap, timestampNs));
+//        } else {
+//            latestFrames.add(new SynchronizedFrame(bitmap, timestampNs));
+//            if (latestFrames.size() > LATEST_FRAMES_CAP) {
+//                latestFrames.getFirst().close();
+//                latestFrames.removeFirst();
+//            }
+//        }
+//    }
 
     private PhaseConfig loadPhaseConfigFile() throws JSONException {
         // Load phase config file and pass to phase aligner.
@@ -815,7 +811,9 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
                         phaseAlignController,
                         this,
                         softwareSyncController.softwareSync,
-                        loadPhaseConfigChecked());
+                        loadPhaseConfigChecked(),
+                        stereoController
+                );
     }
 
     private void configureCaptureSession() {

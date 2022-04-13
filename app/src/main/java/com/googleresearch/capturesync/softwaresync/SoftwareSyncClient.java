@@ -118,7 +118,7 @@ public class SoftwareSyncClient extends SoftwareSyncBase {
     heartbeatScheduler.scheduleAtFixedRate(
         this::sendHeartbeat, 0, SyncConstants.HEARTBEAT_PERIOD_NS, TimeUnit.NANOSECONDS);
 
-    setStreamClient(new BasicStreamClient(leaderAddress, fileUtils));
+    setBasicStream(new BasicStreamClient(leaderAddress, fileUtils));
   }
 
   /* Resets the client synchronization state. */

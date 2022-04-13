@@ -3,13 +3,10 @@ package com.azaat.smstereo.imagestreaming
 import android.util.Log
 import com.azaat.smstereo.StereoController
 import com.googleresearch.capturesync.CameraActivity
-import com.googleresearch.capturesync.Frame
-import com.googleresearch.capturesync.FrameInfo
+import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
 import java.net.ServerSocket
-import java.nio.file.Files
-import java.nio.file.Paths
 
 /**
  * Receives images sent from the client smartphone
@@ -17,18 +14,16 @@ import java.nio.file.Paths
  */
 class BasicStreamServer(
     private val utils: FileTransferUtils,
-    frameInfo: FrameInfo,
     private val timeDomainConverter: SoftwareSyncBase,
     stereoController: StereoController
-) : StreamServer() {
+) : BasicStream() {
     @Volatile
-    override var isExecuting = false
+    var isExecuting = false
         private set
 
-    var latestFramesBuffer: ArrayDeque<Frame> = ArrayDeque()
-        private set
+    private val latestFrames: java.util.ArrayDeque<SynchronizedFrame> = java.util.ArrayDeque()
 
-    private val imageMatcher: ImageMatcher = ImageMatcher(frameInfo, stereoController)
+    private val imageMatcher: ImageMatcher = ImageMatcher(latestFrames, stereoController)
     override fun run() {
         isExecuting = true
         Log.d(TAG, "waiting to accept connection from client...")
@@ -57,19 +52,17 @@ class BasicStreamServer(
         }
     }
 
-    fun onStreamFrame(streamFrame: Frame) {
+    override fun onStreamImageAvailable(frame: SynchronizedFrame) {
         // save frame to ram buffer
 
-        latestFramesBuffer.add(streamFrame)
-        if (latestFramesBuffer.size > CameraActivity.LATEST_FRAMES_CAP) {
-            latestFramesBuffer.removeFirst()
+        latestFrames.add(SynchronizedFrame(frame.bitmap, frame.timestampNs))
+        if (latestFrames.size > CameraActivity.LATEST_FRAMES_CAP) {
+            latestFrames.first.close()
+            latestFrames.removeFirst()
         }
     }
 
-    /**
-     * Safe to call even when not executing
-     */
-    override fun stopExecuting() {
+    override fun closeConnection() {
         isExecuting = false
     }
 

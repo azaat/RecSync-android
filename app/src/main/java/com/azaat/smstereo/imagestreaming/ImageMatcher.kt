@@ -1,17 +1,16 @@
 package com.azaat.smstereo.imagestreaming
 
 import android.util.Log
-import com.azaat.smstereo.ImagePairAvailableListener
+import com.azaat.smstereo.OnImagePairAvailableListener
 import com.googleresearch.capturesync.FrameInfo
 import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
-import java.io.File
 
-class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvailableListener: ImagePairAvailableListener) {
+class ImageMatcher(private val latestFrames: java.util.ArrayDeque<SynchronizedFrame>, private val onImagePairAvailableListener: OnImagePairAvailableListener) {
     fun onClientImageAvailable(clientFrame: SynchronizedFrame, timeDomainConverter: SoftwareSyncBase) {
         // takes client frame with timestamp, finds a leader frame with a matching timestamp
         val timestamp = clientFrame.timestampNs
-        val latestFrames = frameInfo.latestFrames
+        val latestFrames = latestFrames
         if (latestFrames.isEmpty()) {
             return
         }
@@ -30,11 +29,11 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
                 val delay = timestamp - timeDomainConverter.leaderTimeNs
                 Log.d(TAG, "Delay: $delay")
 
-                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+                onImagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
             }
             FALLBACK_TO_UNSYNC -> {
-                matchingFrame = latestFrames.last
-                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+                matchingFrame = latestFrames.last()
+                onImagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
             }
             else -> {
                 Log.d(TAG, "Match not found")

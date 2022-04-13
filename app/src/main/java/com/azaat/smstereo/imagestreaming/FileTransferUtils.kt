@@ -1,6 +1,5 @@
 package com.azaat.smstereo.imagestreaming
 
-import android.R.attr.data
 import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Log

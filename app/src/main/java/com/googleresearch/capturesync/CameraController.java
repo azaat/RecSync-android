@@ -23,7 +23,6 @@ import android.hardware.camera2.CameraCharacteristics;
 import android.hardware.camera2.CameraDevice;
 import android.hardware.camera2.CaptureResult;
 import android.media.ImageReader;
-import android.os.Environment;
 import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
@@ -31,6 +30,7 @@ import android.util.Size;
 import android.view.Surface;
 import android.widget.Toast;
 
+import com.azaat.smstereo.OnStreamImageAvailableListener;
 import com.googleresearch.capturesync.ImageMetadataSynchronizer.CaptureRequestTag;
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
 import com.googleresearch.capturesync.softwaresync.TimeUtils;
@@ -103,7 +103,8 @@ public class CameraController {
           PhaseAlignController phaseAlignController,
           CameraActivity context,
           TimeDomainConverter timeDomainConverter,
-          PhaseConfig phaseConfig
+          PhaseConfig phaseConfig,
+          OnStreamImageAvailableListener onStreamImageAvailableListener
           ) {
     this.phaseConfig = phaseConfig;
 
@@ -116,7 +117,7 @@ public class CameraController {
 
     resultProcessor =
             new ResultProcessor(
-                    timeDomainConverter, context, Constants.SAVE_JPG_FROM_YUV, Constants.JPG_QUALITY);
+                    timeDomainConverter, context, Constants.SAVE_JPG_FROM_YUV, onStreamImageAvailableListener, Constants.JPG_QUALITY);
 
     imageReaders = new ArrayList<>();
     final int imageBuffer = 1;

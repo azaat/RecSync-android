@@ -2,7 +2,7 @@ package com.azaat.smstereo
 
 import com.googleresearch.capturesync.SynchronizedFrame
 
-interface ImagePairAvailableListener {
+interface OnImagePairAvailableListener {
     fun onImagePairAvailable(
             clientFrameTimestampNs: Long,
             leaderFrameTimestampNs: Long,

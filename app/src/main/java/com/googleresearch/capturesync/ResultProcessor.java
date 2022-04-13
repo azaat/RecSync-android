@@ -36,6 +36,7 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+import com.azaat.smstereo.OnStreamImageAvailableListener;
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
 
 import java.io.File;
@@ -56,6 +57,7 @@ public class ResultProcessor {
   private final CameraActivity context;
   private final TimeDomainConverter timeDomainConverter;
   private final RenderScript mRenderScript;
+  private final OnStreamImageAvailableListener onStreamImageAvailableListener;
   private final ScriptIntrinsicYuvToRGB mYuvToRgb;
   private final int jpgQuality;
 
@@ -63,9 +65,11 @@ public class ResultProcessor {
       TimeDomainConverter timeDomainConverter,
       CameraActivity context,
       boolean saveJpgFromYuv,
+      OnStreamImageAvailableListener onStreamImageAvailableListener,
       int jpgQuality) {
     this.timeDomainConverter = timeDomainConverter;
     this.context = context;
+    this.onStreamImageAvailableListener = onStreamImageAvailableListener;
     // Copy from constants... make it a user parameter.
     this.jpgQuality = jpgQuality;
 
@@ -109,8 +113,7 @@ public class ResultProcessor {
         handler.post(
                 () -> {
                   Bitmap bitmap = yuv420ToBitmap(nv21, imageWidth, imageHeight);
-                  context.onStreamFrame(bitmap, syncedSensorTimestampNs);
-//                  saveJpg(yuvImage, jpgFile);
+                  onStreamImageAvailableListener.onStreamImageAvailable(new SynchronizedFrame(bitmap, syncedSensorTimestampNs));
                 }
         );
       } else {
