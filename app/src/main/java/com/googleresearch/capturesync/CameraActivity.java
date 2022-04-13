@@ -77,9 +77,9 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
+//import java.nio.file.Files;
+//import java.nio.file.Path;
+//import java.nio.file.Paths;
 import java.text.SimpleDateFormat;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -324,15 +324,14 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
 
         // Fit an image inside a rectangle maximizing the resulting area and centering (coordinates are
         // rounded down).
-        float ratio = 1f;
-        if (viewfinderResolution.getWidth() > viewfinderResolution.getHeight()) {
-            ratio = (float) viewfinderResolution.getWidth() / displaySize.x;
-        } else {
-            ratio = (float) viewfinderResolution.getHeight() / displaySize.y;
-        }
-
-        params.width = (int) (viewfinderResolution.getWidth() / ratio);
-        params.height = (int) (viewfinderResolution.getHeight() / ratio);
+        params.width =
+                Math.min(
+                        displaySize.x,
+                        displaySize.y * viewfinderResolution.getWidth() / viewfinderResolution.getHeight());
+        params.height =
+                Math.min(
+                        displaySize.x * viewfinderResolution.getHeight() / viewfinderResolution.getWidth(),
+                        displaySize.y);
         params.gravity = Gravity.CENTER;
 
         surfaceView.setLayoutParams(params);
@@ -575,7 +574,7 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
         try {
             softwareSyncController =
                     new SoftwareSyncController(this, phaseAlignController, softwaresyncStatusTextView);
-            setLeaderClientControls(softwareSyncController.isLeader());
+            runOnUiThread(() -> setLeaderClientControls(softwareSyncController.isLeader()));
         } catch (IllegalStateException e) {
             // If wifi is disabled, start pick wifi activity.
             Log.e(
@@ -648,22 +647,22 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
      */
     private void cacheCameraCharacteristics() throws CameraAccessException {
         cameraId = null;
-//        for (String id : cameraManager.getCameraIdList()) {
-//            if (cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
-//                    == Constants.DEFAULT_CAMERA_FACING) {
-//                cameraId = id;
-//                break;
-//            }
-//        }
-        cameraId = "1";
+        for (String id : cameraManager.getCameraIdList()) {
+            if (cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
+                    == Constants.DEFAULT_CAMERA_FACING) {
+                cameraId = id;
+                break;
+            }
+        }
         cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
 
         StreamConfigurationMap scm =
                 cameraCharacteristics.get(CameraCharacteristics.SCALER_STREAM_CONFIGURATION_MAP);
 
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
         // We always capture the viewfinder. Its resolution is special: it's set chosen in Constants.
         List<Size> viewfinderOutputSizes = Arrays.stream(scm.getOutputSizes(SurfaceTexture.class)).filter(
-                size -> size.getHeight() <= 1920 && size.getWidth() <= 1080
+                size -> size.getHeight() <= profile.videoFrameWidth && size.getWidth() <= profile.videoFrameHeight
         ).collect(Collectors.toList());
         if (viewfinderOutputSizes.size() != 0) {
             Log.i(TAG, "Available viewfinder resolutions:");
@@ -676,7 +675,6 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
         viewfinderResolution =
                 Collections.max(viewfinderOutputSizes, new CompareSizesByArea());
 
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
         List<Size> yuvOutputSizes = Arrays.stream(scm.getOutputSizes(ImageFormat.YUV_420_888)).filter(
                 size -> size.getHeight() <= profile.videoFrameHeight && size.getWidth() <= profile.videoFrameWidth
         ).collect(Collectors.toList());
@@ -897,11 +895,12 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
      */
     private String getOutputMediaFilePath() throws IOException {
         File sdcard = getExternalDir();
-        Path dir = Files.createDirectories(Paths.get(sdcard.getAbsolutePath(), SUBDIR_NAME, "VID"));
+        File dir = new File(sdcard.getAbsolutePath() + "/" + SUBDIR_NAME + "/" +  "VID");
+        dir.mkdirs();
         lastTimeStamp = new SimpleDateFormat("yyyyMMdd_HHmmss",
                 Locale.getDefault()).format(new Date());
         String mediaFile;
-        mediaFile = dir.toString() + File.separator + "VID_" + lastTimeStamp + ".mp4";
+        mediaFile = dir + File.separator + "VID_" + lastTimeStamp + ".mp4";
         return mediaFile;
 
     }
@@ -933,7 +932,7 @@ public class CameraActivity extends Activity implements FrameInfo, CameraView {
         lastVideoPath = getOutputMediaFilePath();
         recorder.setOutputFile(lastVideoPath);
 
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
         recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
         recorder.setVideoEncodingBitRate(profile.videoBitRate);
 
