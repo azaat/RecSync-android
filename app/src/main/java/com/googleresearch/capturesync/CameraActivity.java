@@ -62,6 +62,7 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import com.azaat.smstereo.StereoController;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncClient;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
@@ -94,7 +95,7 @@ import java.util.stream.Collectors;
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class CameraActivity extends Activity implements FrameInfo {
+public class CameraActivity extends Activity implements FrameInfo, CameraView {
     public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
@@ -107,6 +108,12 @@ public class CameraActivity extends Activity implements FrameInfo {
     private String lastVideoPath;
     private Integer lastVideoSeqId;
     private CSVLogger mLogger;
+
+    public StereoController getStereoController() {
+        return stereoController;
+    }
+
+    private StereoController stereoController;
 
     public YuvImageUtils getYuvImageUtils() {
         return yuvImageUtils;
@@ -265,6 +272,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         // Set the aspect ratio now that we know the viewfinder resolution.
         surfaceView.setAspectRatio(viewfinderResolution.getWidth(), viewfinderResolution.getHeight());
         yuvImageUtils = new YuvImageUtils(this);
+        stereoController = new StereoController(this);
         // Process the initial configuration (for i.e. initial orientation)
         // We need this because #onConfigurationChanged doesn't get called when
         // the app launches
@@ -480,9 +488,8 @@ public class CameraActivity extends Activity implements FrameInfo {
 
             calibrateButton.setOnClickListener(
                     view -> {
-                        SoftwareSyncLeader softwareSyncLeader = ((SoftwareSyncLeader) softwareSyncController.softwareSync);
                         // TODO: how to set up interaction (StereoController <-> UI in Activity) correctly?
-                        softwareSyncLeader.getStereoController().runStereoCalibration();
+                        stereoController.runStereoCalibration();
                     }
             );
 
@@ -641,13 +648,14 @@ public class CameraActivity extends Activity implements FrameInfo {
      */
     private void cacheCameraCharacteristics() throws CameraAccessException {
         cameraId = null;
-        for (String id : cameraManager.getCameraIdList()) {
-            if (cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
-                    == Constants.DEFAULT_CAMERA_FACING) {
-                cameraId = id;
-                break;
-            }
-        }
+//        for (String id : cameraManager.getCameraIdList()) {
+//            if (cameraManager.getCameraCharacteristics(id).get(CameraCharacteristics.LENS_FACING)
+//                    == Constants.DEFAULT_CAMERA_FACING) {
+//                cameraId = id;
+//                break;
+//            }
+//        }
+        cameraId = "1";
         cameraCharacteristics = cameraManager.getCameraCharacteristics(cameraId);
 
         StreamConfigurationMap scm =
@@ -1070,6 +1078,8 @@ public class CameraActivity extends Activity implements FrameInfo {
                 return;
             }
         }
+
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
 
         // All permissions granted. Continue startup.
         onCreateWithPermission();

@@ -16,7 +16,7 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
             return
         }
 
-        val matchingFrame = latestFrames.stream()
+        var matchingFrame = latestFrames.stream()
             .filter { leaderFrame: SynchronizedFrame -> leaderFrame.timestampNs - timestamp < MATCHING_THRESHOLD }
             .min(Comparator.comparingLong { leaderFrame: SynchronizedFrame ->
                 Math.abs(
@@ -24,24 +24,29 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
                 )
             }
             ).orElse(null)
-        if (matchingFrame != null) {
-            Log.d(TAG, "Found match for the client frame: ${matchingFrame.timestampNs} $timestamp")
-            val delay = timestamp - timeDomainConverter.leaderTimeNs
-            Log.d(TAG, "Delay: $delay")
+        when {
+            matchingFrame != null -> {
+                Log.d(TAG, "Found match for the client frame: ${matchingFrame.timestampNs} $timestamp")
+                val delay = timestamp - timeDomainConverter.leaderTimeNs
+                Log.d(TAG, "Delay: $delay")
 
-            imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs)
-        } else {
-            Log.d(TAG, "Match not found")
-            Log.d(TAG, "Client: $timestamp")
-            Log.d(TAG, "Leader ts: $latestFrames")
+                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+            }
+            FALLBACK_TO_UNSYNC -> {
+                matchingFrame = latestFrames.last
+                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+            }
+            else -> {
+                Log.d(TAG, "Match not found")
+                Log.d(TAG, "Client: $timestamp")
+                Log.d(TAG, "Leader ts: $latestFrames")
+            }
         }
-
-
-        frameInfo.displayStreamFrame(clientFrame)
     }
 
     companion object {
         private const val MATCHING_THRESHOLD = 5000000L
         private const val TAG = "ImageMatcher"
+        private const val FALLBACK_TO_UNSYNC = true
     }
 }

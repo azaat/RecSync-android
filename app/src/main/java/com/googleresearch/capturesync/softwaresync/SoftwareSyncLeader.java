@@ -19,6 +19,8 @@ package com.googleresearch.capturesync.softwaresync;
 import android.util.Log;
 
 import com.azaat.smstereo.StereoController;
+import com.azaat.smstereo.imagestreaming.BasicStreamServer;
+import com.azaat.smstereo.imagestreaming.FileTransferUtils;
 import com.googleresearch.capturesync.FrameInfo;
 
 import java.io.IOException;
@@ -36,9 +38,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-import com.azaat.smstereo.imagestreaming.FileTransferUtils;
-import com.azaat.smstereo.imagestreaming.BasicStreamServer;
-
 /**
  * Leader which listens for registrations from SoftwareSyncClients, allowing it to broadcast times
  * at which both itself and clients will simultaneously perform actions.
@@ -52,239 +51,251 @@ import com.azaat.smstereo.imagestreaming.BasicStreamServer;
  * the leader's to the precision requested.
  */
 public class SoftwareSyncLeader extends SoftwareSyncBase {
-  /** List of connected clients. */
-  private final Map<InetAddress, ClientInfo> clients = new HashMap<>();
+    /**
+     * List of connected clients.
+     */
+    private final Map<InetAddress, ClientInfo> clients = new HashMap<>();
 
-  private final Object clientsLock = new Object();
+    private final Object clientsLock = new Object();
 
-  /** Keeps track of how long since each client heartbeat was received, removing when stale. */
-  private final ScheduledExecutorService staleClientChecker = Executors.newScheduledThreadPool(1);
+    /**
+     * Keeps track of how long since each client heartbeat was received, removing when stale.
+     */
+    private final ScheduledExecutorService staleClientChecker = Executors.newScheduledThreadPool(1);
 
-  /** Send RPC messages on a separate thread, avoiding Network on Main Thread exceptions. */
-  private final ExecutorService rpcMessageExecutor = Executors.newSingleThreadExecutor();
+    /**
+     * Send RPC messages on a separate thread, avoiding Network on Main Thread exceptions.
+     */
+    private final ExecutorService rpcMessageExecutor = Executors.newSingleThreadExecutor();
 
-  /** Manages SNTP synchronization of clients. */
-  private final SimpleNetworkTimeProtocol sntp;
+    /**
+     * Manages SNTP synchronization of clients.
+     */
+    private final SimpleNetworkTimeProtocol sntp;
+    private final StereoController stereoController;
 
-  public StereoController getStereoController() {
-    return stereoController;
-  }
+    public SoftwareSyncLeader(
+            String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, FrameInfo frameInfo, StereoController stereoController) {
+        this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, frameInfo, stereoController);
+    }
 
-  private final StereoController stereoController;
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private SoftwareSyncLeader(
+            String name,
+            Ticker localClock,
+            long initialTime,
+            InetAddress address,
+            Map<Integer, RpcCallback> rpcCallbacks,
+            FileTransferUtils fileUtils,
+            FrameInfo frameInfo,
+            StereoController stereoController) {
+        // Note: Leader address is required to be the same as local address.
+        super(name, localClock, address, address, fileUtils);
 
-  public SoftwareSyncLeader(
-          String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, FrameInfo frameInfo) {
-    this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, frameInfo);
-  }
+        // Set up the offsetNs so that the leader synchronized time (via getLeaderTimeNs()) on all
+        // devices
+        // runs starting from the initial time given. When initialTimeNs is zero the
+        // leader synchronized time is the default of localClock, ie. the time since boot of the leader
+        // device.
+        // For convenience, all devices could instead be shifted to the leader device UTC time,
+        // ex. initialTimeNs = TimeUtils.millisToNanos(System.currentTimeMillis())
+        setLeaderFromLocalNs(localClock.read() - initialTime);
+        // Add client-specific RPC callbacks.
+        rpcMap.put(
+                SyncConstants.METHOD_HEARTBEAT,
+                payload -> {
+                    // Received heartbeat from client, send back an acknowledge and then
+                    // check the client state and add to sntp queue if needed.
+                    Log.v(TAG, "Heartbeat received from client: " + payload);
+                    try {
+                        processHeartbeatRpc(payload);
+                    } catch (UnknownHostException e) {
+                        Log.e(TAG, "Processed heartbeat with corrupt host address: " + payload);
+                    }
+                });
+        this.stereoController = stereoController;
 
-  @SuppressWarnings("FutureReturnValueIgnored")
-  private SoftwareSyncLeader(
-          String name,
-          Ticker localClock,
-          long initialTime,
-          InetAddress address,
-          Map<Integer, RpcCallback> rpcCallbacks,
-          FileTransferUtils fileUtils,
-          FrameInfo frameInfo) {
-    // Note: Leader address is required to be the same as local address.
-    super(name, localClock, address, address, fileUtils);
+        // Add callbacks passed by user.
+        addPublicRpcCallbacks(rpcCallbacks);
 
-    // Set up the offsetNs so that the leader synchronized time (via getLeaderTimeNs()) on all
-    // devices
-    // runs starting from the initial time given. When initialTimeNs is zero the
-    // leader synchronized time is the default of localClock, ie. the time since boot of the leader
-    // device.
-    // For convenience, all devices could instead be shifted to the leader device UTC time,
-    // ex. initialTimeNs = TimeUtils.millisToNanos(System.currentTimeMillis())
-    setLeaderFromLocalNs(localClock.read() - initialTime);
-    // Add client-specific RPC callbacks.
-    rpcMap.put(
-        SyncConstants.METHOD_HEARTBEAT,
-        payload -> {
-          // Received heartbeat from client, send back an acknowledge and then
-          // check the client state and add to sntp queue if needed.
-          Log.v(TAG, "Heartbeat received from client: " + payload);
-          try {
-            processHeartbeatRpc(payload);
-          } catch (UnknownHostException e) {
-            Log.e(TAG, "Processed heartbeat with corrupt host address: " + payload);
-          }
-        });
+        // Set up SNTP instance for synchronizing with clients.
+        sntp = new SimpleNetworkTimeProtocol(localClock, sntpSocket, SyncConstants.SNTP_PORT, this);
 
-    // Add callbacks passed by user.
-    addPublicRpcCallbacks(rpcCallbacks);
-
-    // Set up SNTP instance for synchronizing with clients.
-    sntp = new SimpleNetworkTimeProtocol(localClock, sntpSocket, SyncConstants.SNTP_PORT, this);
-
-    // Start periodically checking for stale clients and removing as needed.
-    staleClientChecker.scheduleAtFixedRate(
-        this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
+        // Start periodically checking for stale clients and removing as needed.
+        staleClientChecker.scheduleAtFixedRate(
+                this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-    stereoController = new StereoController();
-    setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this, stereoController));
-    getStreamServer().start();
-  }
-
-  public Map<InetAddress, ClientInfo> getClients() {
-    synchronized (clientsLock) {
-      return Collections.unmodifiableMap(clients);
+        setStreamServer(new BasicStreamServer(fileUtils, frameInfo, this, stereoController));
+        getStreamServer().start();
     }
-  }
 
-  /**
-   * Checks if the address is already associated with one of the clients in the list of tracked
-   * clients. If so, just update the last heartbeat, otherwise create a new client entry in the
-   * list.
-   */
-  private void addOrUpdateClient(String name, InetAddress address) {
-    // Check if it's a new client, so we don't add again.
-    synchronized (clientsLock) {
-      boolean clientExists = clients.containsKey(address);
-      // Add or replace entry with an updated ClientInfo.
-      long offsetNs = 0;
-      long syncAccuracyNs = 0;
-      if (clientExists) {
-        offsetNs = clients.get(address).offset();
-        syncAccuracyNs = clients.get(address).syncAccuracy();
-      }
-      ClientInfo updatedClient =
-          ClientInfo.create(name, address, offsetNs, syncAccuracyNs, localClock.read());
-      clients.put(address, updatedClient);
-
-      if (!clientExists) {
-        // Notify via message on interface if client is new.
-        onRpc(SyncConstants.METHOD_MSG_ADDED_CLIENT, updatedClient.name());
-      }
+    public StereoController getStereoController() {
+        return stereoController;
     }
-  }
 
-  /** Removes clients whose last heartbeat was longer than STALE_TIME_NS ago. */
-  private void removeStaleClients() {
-    long t = localClock.read();
-    synchronized (clientsLock) {
-      // Use iterator to avoid concurrent modification exception.
-      Iterator<Entry<InetAddress, ClientInfo>> clientIterator = clients.entrySet().iterator();
-      while (clientIterator.hasNext()) {
-        ClientInfo client = clientIterator.next().getValue();
-        long timeSince = t - client.lastHeartbeat();
-        if (timeSince > SyncConstants.STALE_TIME_NS) {
-          Log.w(
-              TAG,
-              String.format(
-                  "Stale client %s : time since %,d seconds",
-                  client.name(), TimeUtils.nanosToSeconds(timeSince)));
-
-          // Remove entry from the client list first.
-          clientIterator.remove();
-          // Client hasn't responded in a while, remove from list.
-          onRpc(SyncConstants.METHOD_MSG_REMOVED_CLIENT, client.name());
+    public Map<InetAddress, ClientInfo> getClients() {
+        synchronized (clientsLock) {
+            return Collections.unmodifiableMap(clients);
         }
-      }
-    }
-  }
-
-  /** Finds and updates client sync accuracy within list. */
-  void updateClientWithOffsetResponse(InetAddress clientAddress, SntpOffsetResponse response) {
-    // Update client sync accuracy locally.
-    synchronized (clientsLock) {
-      if (!clients.containsKey(clientAddress)) {
-        Log.w(TAG, "Tried to update a client info that is no longer in the list, Skipping.");
-        return;
-      }
-      final ClientInfo client = clients.get(clientAddress);
-      ClientInfo updatedClient =
-          ClientInfo.create(
-              client.name(),
-              client.address(),
-              response.offsetNs(),
-              response.syncAccuracyNs(),
-              client.lastHeartbeat());
-      clients.put(client.address(), updatedClient);
-    }
-  }
-
-  /**
-   * Sends an RPC to every client in the leader's clients list.
-   *
-   * @param method int type of RPC (in {@link SyncConstants}).
-   * @param payload String payload.
-   */
-  @SuppressWarnings("FutureReturnValueIgnored")
-  private void internalBroadcastRpc(int method, String payload) {
-    // Send RPC message to all clients and call onRPC of self as well.
-    synchronized (clientsLock) {
-      for (InetAddress address : clients.keySet()) {
-        rpcMessageExecutor.submit(() -> sendRpc(method, payload, address));
-      }
     }
 
-    // Also call onRpc for self (leader).
-    onRpc(method, payload);
-  }
+    /**
+     * Checks if the address is already associated with one of the clients in the list of tracked
+     * clients. If so, just update the last heartbeat, otherwise create a new client entry in the
+     * list.
+     */
+    private void addOrUpdateClient(String name, InetAddress address) {
+        // Check if it's a new client, so we don't add again.
+        synchronized (clientsLock) {
+            boolean clientExists = clients.containsKey(address);
+            // Add or replace entry with an updated ClientInfo.
+            long offsetNs = 0;
+            long syncAccuracyNs = 0;
+            if (clientExists) {
+                offsetNs = clients.get(address).offset();
+                syncAccuracyNs = clients.get(address).syncAccuracy();
+            }
+            ClientInfo updatedClient =
+                    ClientInfo.create(name, address, offsetNs, syncAccuracyNs, localClock.read());
+            clients.put(address, updatedClient);
 
-  /**
-   * Public-facing broadcast RPC to all current clients, for non-softwaresync RPC methods only.
-   *
-   * @param method int type of RPC, must be greater than {@link
-   *     SyncConstants#START_NON_SOFTWARESYNC_METHOD_IDS}.
-   * @param payload String payload.
-   */
-  public void broadcastRpc(int method, String payload) {
-    if (method < SyncConstants.START_NON_SOFTWARESYNC_METHOD_IDS) {
-      throw new IllegalArgumentException(
-          String.format(
-              "Given method id %s, User method ids must" + " be >= %s",
-              method, SyncConstants.START_NON_SOFTWARESYNC_METHOD_IDS));
+            if (!clientExists) {
+                // Notify via message on interface if client is new.
+                onRpc(SyncConstants.METHOD_MSG_ADDED_CLIENT, updatedClient.name());
+            }
+        }
     }
-    internalBroadcastRpc(method, payload);
-  }
 
-  @Override
-  public void close() throws IOException {
-    sntp.close();
-    staleClientChecker.shutdown();
-    getStreamServer().stopExecuting();
-    try {
-      // Wait up to 0.5 seconds for this to close.
-      staleClientChecker.awaitTermination(500, TimeUnit.MILLISECONDS);
-    } catch (InterruptedException e) {
-      Thread.currentThread().interrupt(); // Restore the interrupted status.
-      // Should only happen on app shutdown, fall out and continue.
+    /**
+     * Removes clients whose last heartbeat was longer than STALE_TIME_NS ago.
+     */
+    private void removeStaleClients() {
+        long t = localClock.read();
+        synchronized (clientsLock) {
+            // Use iterator to avoid concurrent modification exception.
+            Iterator<Entry<InetAddress, ClientInfo>> clientIterator = clients.entrySet().iterator();
+            while (clientIterator.hasNext()) {
+                ClientInfo client = clientIterator.next().getValue();
+                long timeSince = t - client.lastHeartbeat();
+                if (timeSince > SyncConstants.STALE_TIME_NS) {
+                    Log.w(
+                            TAG,
+                            String.format(
+                                    "Stale client %s : time since %,d seconds",
+                                    client.name(), TimeUtils.nanosToSeconds(timeSince)));
+
+                    // Remove entry from the client list first.
+                    clientIterator.remove();
+                    // Client hasn't responded in a while, remove from list.
+                    onRpc(SyncConstants.METHOD_MSG_REMOVED_CLIENT, client.name());
+                }
+            }
+        }
     }
-    super.close();
-  }
 
-  /**
-   * Process a heartbeat rpc call from a client by responding with a heartbeat acknowledge, adding
-   * or updating the client in the tracked clients list, and submitting a new SNTP sync request if
-   * the client state is not yet synchronized.
-   *
-   * @param payload format of "ClientName,ClientAddress,ClientState"
-   */
-  private void processHeartbeatRpc(String payload) throws UnknownHostException {
-    List<String> parts = Arrays.asList(payload.split(","));
-    if (parts.size() != 3) {
-      Log.e(
-          TAG,
-          "Heartbeat message has the wrong format, expected 3 comma-delimitted parts: "
-              + payload
-              + ". Skipping.");
-      return;
+    /**
+     * Finds and updates client sync accuracy within list.
+     */
+    void updateClientWithOffsetResponse(InetAddress clientAddress, SntpOffsetResponse response) {
+        // Update client sync accuracy locally.
+        synchronized (clientsLock) {
+            if (!clients.containsKey(clientAddress)) {
+                Log.w(TAG, "Tried to update a client info that is no longer in the list, Skipping.");
+                return;
+            }
+            final ClientInfo client = clients.get(clientAddress);
+            ClientInfo updatedClient =
+                    ClientInfo.create(
+                            client.name(),
+                            client.address(),
+                            response.offsetNs(),
+                            response.syncAccuracyNs(),
+                            client.lastHeartbeat());
+            clients.put(client.address(), updatedClient);
+        }
     }
-    String clientName = parts.get(0);
-    InetAddress clientAddress = InetAddress.getByName(parts.get(1));
-    boolean clientSyncState = Boolean.parseBoolean(parts.get(2));
 
-    // Send heartbeat acknowledge RPC back to client first, containing the same payload.
-    sendRpc(SyncConstants.METHOD_HEARTBEAT_ACK, payload, clientAddress);
+    /**
+     * Sends an RPC to every client in the leader's clients list.
+     *
+     * @param method  int type of RPC (in {@link SyncConstants}).
+     * @param payload String payload.
+     */
+    @SuppressWarnings("FutureReturnValueIgnored")
+    private void internalBroadcastRpc(int method, String payload) {
+        // Send RPC message to all clients and call onRPC of self as well.
+        synchronized (clientsLock) {
+            for (InetAddress address : clients.keySet()) {
+                rpcMessageExecutor.submit(() -> sendRpc(method, payload, address));
+            }
+        }
 
-    // Add or update client in clients.
-    addOrUpdateClient(clientName, clientAddress);
-
-    // If the client state is not yet synchronized, add it to the SNTP queue.
-    if (!clientSyncState) {
-      sntp.submitNewSyncRequest(clientAddress);
+        // Also call onRpc for self (leader).
+        onRpc(method, payload);
     }
-  }
+
+    /**
+     * Public-facing broadcast RPC to all current clients, for non-softwaresync RPC methods only.
+     *
+     * @param method  int type of RPC, must be greater than {@link
+     *                SyncConstants#START_NON_SOFTWARESYNC_METHOD_IDS}.
+     * @param payload String payload.
+     */
+    public void broadcastRpc(int method, String payload) {
+        if (method < SyncConstants.START_NON_SOFTWARESYNC_METHOD_IDS) {
+            throw new IllegalArgumentException(
+                    String.format(
+                            "Given method id %s, User method ids must" + " be >= %s",
+                            method, SyncConstants.START_NON_SOFTWARESYNC_METHOD_IDS));
+        }
+        internalBroadcastRpc(method, payload);
+    }
+
+    @Override
+    public void close() throws IOException {
+        sntp.close();
+        staleClientChecker.shutdown();
+        getStreamServer().stopExecuting();
+        try {
+            // Wait up to 0.5 seconds for this to close.
+            staleClientChecker.awaitTermination(500, TimeUnit.MILLISECONDS);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt(); // Restore the interrupted status.
+            // Should only happen on app shutdown, fall out and continue.
+        }
+        super.close();
+    }
+
+    /**
+     * Process a heartbeat rpc call from a client by responding with a heartbeat acknowledge, adding
+     * or updating the client in the tracked clients list, and submitting a new SNTP sync request if
+     * the client state is not yet synchronized.
+     *
+     * @param payload format of "ClientName,ClientAddress,ClientState"
+     */
+    private void processHeartbeatRpc(String payload) throws UnknownHostException {
+        List<String> parts = Arrays.asList(payload.split(","));
+        if (parts.size() != 3) {
+            Log.e(
+                    TAG,
+                    "Heartbeat message has the wrong format, expected 3 comma-delimitted parts: "
+                            + payload
+                            + ". Skipping.");
+            return;
+        }
+        String clientName = parts.get(0);
+        InetAddress clientAddress = InetAddress.getByName(parts.get(1));
+        boolean clientSyncState = Boolean.parseBoolean(parts.get(2));
+
+        // Send heartbeat acknowledge RPC back to client first, containing the same payload.
+        sendRpc(SyncConstants.METHOD_HEARTBEAT_ACK, payload, clientAddress);
+
+        // Add or update client in clients.
+        addOrUpdateClient(clientName, clientAddress);
+
+        // If the client state is not yet synchronized, add it to the SNTP queue.
+        if (!clientSyncState) {
+            sntp.submitNewSyncRequest(clientAddress);
+        }
+    }
 }

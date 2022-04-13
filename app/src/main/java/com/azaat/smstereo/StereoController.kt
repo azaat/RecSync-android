@@ -1,20 +1,23 @@
 package com.azaat.smstereo
 
 import android.util.Log
+import com.googleresearch.capturesync.CameraView
+import com.googleresearch.capturesync.SynchronizedFrame
 import java.io.File
-import java.lang.RuntimeException
-import kotlin.Throws
+import java.util.*
 
 /**
  * Should be instantiated only on leader;
  * handles events associated with stereo processing
  */
-class StereoController () : ImagePairAvailableListener{
+class StereoController (private val cameraView: CameraView) : ImagePairAvailableListener{
     /**
      * TODO: modifications in UI based on the state of StereoController?
      */
     var stereoControllerState = StereoControllerStates.UNCALIBRATED
         private set
+
+    private val latestFrames: ArrayDeque<SynchronizedFrame> = ArrayDeque()
 
     /**
      * Records a stereo sequence, processes recorded frames
@@ -38,7 +41,7 @@ class StereoController () : ImagePairAvailableListener{
 
     private fun runStereoRecordingSession() {}
 
-    public fun onStereoRecordingSessionComplete(recordedDataDir: File) {
+    fun onStereoRecordingSessionComplete(recordedDataDir: File) {
         if (stereoControllerState == StereoControllerStates.CALIBRATING) {
             runCalibration(recordedDataDir)
         }
@@ -48,12 +51,15 @@ class StereoController () : ImagePairAvailableListener{
 
     }
 
-    public override fun onImagePairAvailable(
+    override fun onImagePairAvailable(
         clientFrameTimestampNs: Long,
-        leaderFrameTimestampNs: Long
+        leaderFrameTimestampNs: Long,
+        clientFrame: SynchronizedFrame
     ) {
         Log.d(TAG, "$clientFrameTimestampNs $leaderFrameTimestampNs")
+        cameraView.displayStreamFrame(clientFrame)
     }
+
 
     companion object {
         const val TAG = "StereoController"
