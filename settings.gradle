@@ -1,2 +1,4 @@
 include ':app'
 rootProject.name='CaptureSync'
+include ':app', ':sgbm_android_lib', ':opencv'
+project(':opencv').projectDir = new File(opencvsdk + '/sdk')
