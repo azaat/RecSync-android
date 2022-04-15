@@ -12,7 +12,8 @@ import java.util.*
  * Should be instantiated only on leader;
  * handles events associated with stereo processing
  */
-class StereoController(
+
+class StereoController @JvmOverloads constructor(
     private val cameraView: CameraView,
     private val softwareSyncController: SoftwareSyncController,
     private val stereoDepth: StereoDepth = StereoDepth()
