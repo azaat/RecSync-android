@@ -113,7 +113,7 @@ public class ResultProcessor {
         handler.post(
                 () -> {
                   Bitmap bitmap = yuv420ToBitmap(nv21, imageWidth, imageHeight);
-                  onStreamImageAvailableListener.onStreamImageAvailable(new SynchronizedFrame(bitmap, syncedSensorTimestampNs));
+                  onStreamImageAvailableListener.onStreamImageAvailable(new SynchronizedFrame(bitmap, syncedSensorTimestampNs, nv21));
                 }
         );
       } else {

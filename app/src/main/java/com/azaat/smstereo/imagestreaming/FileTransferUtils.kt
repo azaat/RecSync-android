@@ -53,7 +53,7 @@ class FileTransferUtils(var mContext: Context) {
         dIn.close()
 
         val bmp = BitmapFactory.decodeByteArray(byteArray, 0, byteArray.size)
-        return SynchronizedFrame(bmp, timestampNs)
+        return SynchronizedFrame(bmp, timestampNs, byteArray)
     }
 
     /**

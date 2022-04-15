@@ -55,7 +55,7 @@ class BasicStreamServer(
     override fun onStreamImageAvailable(frame: SynchronizedFrame) {
         // save frame to ram buffer
 
-        latestFrames.add(SynchronizedFrame(frame.bitmap, frame.timestampNs))
+        latestFrames.add(frame)
         if (latestFrames.size > CameraActivity.LATEST_FRAMES_CAP) {
             latestFrames.first.close()
             latestFrames.removeFirst()

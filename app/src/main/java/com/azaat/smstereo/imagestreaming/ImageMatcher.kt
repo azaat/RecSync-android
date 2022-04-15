@@ -29,11 +29,11 @@ class ImageMatcher(private val latestFrames: java.util.ArrayDeque<SynchronizedFr
                 val delay = timestamp - timeDomainConverter.leaderTimeNs
                 Log.d(TAG, "Delay: $delay")
 
-                onImagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+                onImagePairAvailableListener.onImagePairAvailable(clientFrame, matchingFrame)
             }
             FALLBACK_TO_UNSYNC -> {
                 matchingFrame = latestFrames.last()
-                onImagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs, clientFrame)
+                onImagePairAvailableListener.onImagePairAvailable(clientFrame, matchingFrame)
             }
             else -> {
                 Log.d(TAG, "Match not found")
