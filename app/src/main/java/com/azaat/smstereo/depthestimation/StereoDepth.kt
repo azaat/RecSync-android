@@ -1,5 +1,5 @@
 package com.azaat.smstereo.depthestimation
 
-class StereoCalibration {
+class StereoDepth {
 
 }
