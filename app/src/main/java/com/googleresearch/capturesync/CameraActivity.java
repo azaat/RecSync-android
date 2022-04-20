@@ -269,6 +269,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         // We need this because #onConfigurationChanged doesn't get called when
         // the app launches
         maybeUpdateConfiguration(getResources().getConfiguration());
+
     }
 
     private void setupPhaseAlignController() {
@@ -655,7 +656,7 @@ public class CameraActivity extends Activity implements FrameInfo {
 
         // We always capture the viewfinder. Its resolution is special: it's set chosen in Constants.
         List<Size> viewfinderOutputSizes = Arrays.stream(scm.getOutputSizes(SurfaceTexture.class)).filter(
-                size -> size.getHeight() <= 1920 && size.getWidth() <= 1080
+                size -> size.getHeight() <= 480 && size.getWidth() <= 720
         ).collect(Collectors.toList());
         if (viewfinderOutputSizes.size() != 0) {
             Log.i(TAG, "Available viewfinder resolutions:");
@@ -925,7 +926,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         lastVideoPath = getOutputMediaFilePath();
         recorder.setOutputFile(lastVideoPath);
 
-        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_1080P);
+        CamcorderProfile profile = CamcorderProfile.get(CamcorderProfile.QUALITY_480P);
         recorder.setVideoSize(profile.videoFrameWidth, profile.videoFrameHeight);
         recorder.setVideoEncodingBitRate(profile.videoBitRate);
 

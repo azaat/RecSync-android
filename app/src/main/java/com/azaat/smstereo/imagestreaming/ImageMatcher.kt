@@ -2,16 +2,19 @@ package com.azaat.smstereo.imagestreaming
 
 import android.util.Log
 import com.azaat.smstereo.ImagePairAvailableListener
-import com.googleresearch.capturesync.FrameInfo
+import com.azaat.smstereo.depthestimation.StereoDepth
+import com.googleresearch.capturesync.CameraActivity
 import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
-import java.io.File
+import java.io.FileInputStream
 
-class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvailableListener: ImagePairAvailableListener) {
+class ImageMatcher(private val context: CameraActivity, private val imagePairAvailableListener: ImagePairAvailableListener) {
+    val stereoDepth: StereoDepth = StereoDepth(FileInputStream(context.getExternalFilesDir(null).toString() + "/calib_params.xml").readBytes())
+
     fun onClientImageAvailable(clientFrame: SynchronizedFrame, timeDomainConverter: SoftwareSyncBase) {
         // takes client frame with timestamp, finds a leader frame with a matching timestamp
         val timestamp = clientFrame.timestampNs
-        val latestFrames = frameInfo.latestFrames
+        val latestFrames = context.latestFrames
         if (!latestFrames.isEmpty()) {
             val matchingFrame = latestFrames.stream()
                 .filter { leaderFrame: SynchronizedFrame -> leaderFrame.timestampNs - timestamp < MATCHING_THRESHOLD }
@@ -27,6 +30,8 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
                 Log.d(TAG, "Delay: $delay")
 
                 imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs)
+                val bitmap = stereoDepth.onImagePairAvailable(clientFrame, matchingFrame)
+                context.displayStreamFrame(SynchronizedFrame(bitmap, clientFrame.timestampNs));
             } else {
                 Log.d(TAG, "Match not found")
                 Log.d(TAG, "Client: $timestamp")
@@ -36,7 +41,6 @@ class ImageMatcher(private val frameInfo: FrameInfo, private val imagePairAvaila
 
 
 
-        frameInfo.displayStreamFrame(clientFrame);
     }
 
     companion object {

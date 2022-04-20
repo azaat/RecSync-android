@@ -41,8 +41,8 @@ opencamera-extended-firebase-adminsdk-yv5yz-e33a8ce5c1.json
 
 /local.properties
 .idea
-.DS_Store
+**/.DS_Store
 /build
 /captures
-.externalNativeBuild
-.cxx
+**/.externalNativeBuild
+**/.cxx
