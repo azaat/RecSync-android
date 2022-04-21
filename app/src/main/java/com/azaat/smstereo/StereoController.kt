@@ -2,8 +2,6 @@ package com.azaat.smstereo
 
 import android.util.Log
 import java.io.File
-import java.lang.RuntimeException
-import kotlin.Throws
 
 /**
  * Should be instantiated only on leader;
@@ -20,7 +18,6 @@ class StereoController () : ImagePairAvailableListener{
      * Records a stereo sequence, processes recorded frames
      */
     fun runStereoCalibration() {
-
     }
 
     /**

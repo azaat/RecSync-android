@@ -4,7 +4,6 @@ import android.util.Log
 import com.azaat.smstereo.StereoController
 import com.googleresearch.capturesync.CameraActivity
 import com.googleresearch.capturesync.Frame
-import com.googleresearch.capturesync.FrameInfo
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
 import java.net.ServerSocket
@@ -17,7 +16,7 @@ import java.nio.file.Paths
  */
 class BasicStreamServer(
     private val utils: FileTransferUtils,
-    private val frameInfo: FrameInfo,
+    private val context: CameraActivity,
     private val timeDomainConverter: SoftwareSyncBase,
     private val stereoController: StereoController
 ) : StreamServer() {
@@ -28,13 +27,13 @@ class BasicStreamServer(
     var latestFramesBuffer: ArrayDeque<Frame> = ArrayDeque()
         private set
 
-    private val imageMatcher: ImageMatcher = ImageMatcher(frameInfo, stereoController)
+    private val imageMatcher: ImageMatcher = ImageMatcher(context, stereoController)
     override fun run() {
         isExecuting = true
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = frameInfo.externalDir
+                val sdcard = context.externalDir
                 val outputDir = Files.createDirectories(
                     Paths.get(
                         sdcard.absolutePath,
