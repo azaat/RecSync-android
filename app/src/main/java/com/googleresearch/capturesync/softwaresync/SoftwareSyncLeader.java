@@ -121,7 +121,7 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     staleClientChecker.scheduleAtFixedRate(
         this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-    stereoController = new StereoController();
+    stereoController = new StereoController(context, context, context.getYuvImageResolution());
     setStreamServer(new BasicStreamServer(fileUtils, context, this, stereoController));
     getStreamServer().start();
   }

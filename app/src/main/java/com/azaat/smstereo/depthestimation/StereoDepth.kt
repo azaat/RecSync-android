@@ -2,17 +2,14 @@ package com.azaat.smstereo.depthestimation
 
 import android.graphics.Bitmap
 import android.util.Log
+import android.util.Size
 import com.googleresearch.capturesync.SynchronizedFrame
 import me.timpushkin.sgbm_android_lib.SgbmAndroidLib.getDepthMap
 import me.timpushkin.sgbm_android_lib.SgbmAndroidLib.loadCalibrationParams
 import java.io.ByteArrayOutputStream
 
-// TODO: move constants or switch to dynamic values
-private const val WIDTH = 720
-private const val HEIGHT = 480
-
-class StereoDepth() {
-    constructor(params: ByteArray) : this() {
+class StereoDepth(params: ByteArray, val yuvOutputSize: Size) {
+    init {
         loadCalibrationParams(params)
     }
 
@@ -29,9 +26,9 @@ class StereoDepth() {
         val byteArrayLeader: ByteArray = stream.toByteArray()
 
         val depthBitmap =  depthArrayToBitmap(
-            getDepthMap(byteArrayLeader,byteArrayClient, WIDTH, HEIGHT),
-            WIDTH,
-            HEIGHT
+            getDepthMap(byteArrayLeader,byteArrayClient, yuvOutputSize.width, yuvOutputSize.height),
+            yuvOutputSize.width,
+            yuvOutputSize.height
         )
         return depthBitmap
     }

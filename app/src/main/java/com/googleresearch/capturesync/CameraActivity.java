@@ -583,8 +583,6 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
         return softwareSyncController.isLeader();
     }
 
-
-
     private PhaseConfig loadPhaseConfigFile() throws JSONException {
         // Load phase config file and pass to phase aligner.
 
@@ -622,6 +620,10 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
             softwareSyncController.close();
             softwareSyncController = null;
         }
+    }
+
+    public Size getYuvImageResolution() {
+        return yuvImageResolution;
     }
 
     /**
