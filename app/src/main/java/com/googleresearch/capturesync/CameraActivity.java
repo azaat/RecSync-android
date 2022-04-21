@@ -65,6 +65,7 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 
 import com.azaat.smstereo.CameraView;
+import com.azaat.smstereo.OnSyncFrameAvailable;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncClient;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
@@ -97,7 +98,7 @@ import java.util.stream.Collectors;
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class CameraActivity extends Activity implements CameraView, FileOperations {
+public class CameraActivity extends Activity implements CameraView, FileOperations, OnSyncFrameAvailable {
     public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
@@ -1069,6 +1070,13 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
     @Override
     protected void onDestroy() {
         super.onDestroy();
+    }
+
+    @Override
+    public void onSyncFrameAvailable(@NonNull SynchronizedFrame frame) {
+        if (softwareSyncController != null) {
+            softwareSyncController.onSyncFrameAvailable(frame);
+        }
     }
 
     /**

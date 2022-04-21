@@ -36,6 +36,7 @@ import android.util.Log;
 
 import androidx.annotation.RequiresApi;
 
+import com.azaat.smstereo.OnSyncFrameAvailable;
 import com.googleresearch.capturesync.softwaresync.TimeDomainConverter;
 
 import java.io.File;
@@ -54,6 +55,7 @@ public class ResultProcessor {
 
   private final Handler handler;
   private final CameraActivity context;
+  private final OnSyncFrameAvailable onSyncFrameAvailableListener;
   private final TimeDomainConverter timeDomainConverter;
   private final RenderScript mRenderScript;
   private final ScriptIntrinsicYuvToRGB mYuvToRgb;
@@ -63,12 +65,13 @@ public class ResultProcessor {
       TimeDomainConverter timeDomainConverter,
       CameraActivity context,
       boolean saveJpgFromYuv,
+      OnSyncFrameAvailable onSyncFrameAvailableListener,
       int jpgQuality) {
     this.timeDomainConverter = timeDomainConverter;
     this.context = context;
     // Copy from constants... make it a user parameter.
     this.jpgQuality = jpgQuality;
-
+    this.onSyncFrameAvailableListener = onSyncFrameAvailableListener;
     HandlerThread thread = new HandlerThread(TAG);
     thread.start();
     // getLooper() blocks until the thread started and its Looper is prepared.
@@ -109,7 +112,7 @@ public class ResultProcessor {
         handler.post(
                 () -> {
                   Bitmap bitmap = yuv420ToBitmap(nv21, imageWidth, imageHeight);
-                  context.onStreamFrame(bitmap, syncedSensorTimestampNs);
+                  onSyncFrameAvailableListener.onSyncFrameAvailable(new SynchronizedFrame(bitmap, syncedSensorTimestampNs));
 //                  saveJpg(yuvImage, jpgFile);
                 }
         );

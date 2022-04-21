@@ -116,7 +116,7 @@ public class CameraController {
 
     resultProcessor =
             new ResultProcessor(
-                    timeDomainConverter, context, Constants.SAVE_JPG_FROM_YUV, Constants.JPG_QUALITY);
+                    timeDomainConverter, context, Constants.SAVE_JPG_FROM_YUV, context, Constants.JPG_QUALITY);
 
     imageReaders = new ArrayList<>();
     final int imageBuffer = 1;
