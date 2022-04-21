@@ -3,7 +3,8 @@ package com.azaat.smstereo.imagestreaming
 import android.util.Log
 import com.azaat.smstereo.StereoController
 import com.googleresearch.capturesync.CameraActivity
-import com.googleresearch.capturesync.Frame
+import com.googleresearch.capturesync.FileOperations
+import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
 import java.net.ServerSocket
@@ -16,24 +17,24 @@ import java.nio.file.Paths
  */
 class BasicStreamServer(
     private val utils: FileTransferUtils,
-    private val context: CameraActivity,
+    private val fileOperations: FileOperations,
     private val timeDomainConverter: SoftwareSyncBase,
-    private val stereoController: StereoController
+    stereoController: StereoController
 ) : StreamServer() {
     @Volatile
     override var isExecuting = false
         private set
 
-    var latestFramesBuffer: ArrayDeque<Frame> = ArrayDeque()
+    var latestFramesBuffer: ArrayDeque<SynchronizedFrame> = ArrayDeque()
         private set
 
-    private val imageMatcher: ImageMatcher = ImageMatcher(context, stereoController)
+    private val imageMatcher: ImageMatcher = ImageMatcher(latestFramesBuffer, stereoController)
     override fun run() {
         isExecuting = true
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = context.externalDir
+                val sdcard = fileOperations.getExternalDir()
                 val outputDir = Files.createDirectories(
                     Paths.get(
                         sdcard.absolutePath,
@@ -64,10 +65,9 @@ class BasicStreamServer(
         }
     }
 
-    fun onStreamFrame(streamFrame: Frame) {
+    override fun onSyncFrameAvailable(frame: SynchronizedFrame) {
         // save frame to ram buffer
-
-        latestFramesBuffer.add(streamFrame)
+        latestFramesBuffer.add(frame)
         if (latestFramesBuffer.size > CameraActivity.LATEST_FRAMES_CAP) {
             latestFramesBuffer.removeFirst()
         }

@@ -17,12 +17,16 @@
 package com.googleresearch.capturesync;
 
 import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.wifi.WifiManager;
 import android.provider.Settings.Secure;
 import android.util.Log;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
+
+import com.azaat.smstereo.OnSyncFrameAvailable;
 import com.googleresearch.capturesync.softwaresync.ClientInfo;
 import com.googleresearch.capturesync.softwaresync.NetworkHelpers;
 import com.googleresearch.capturesync.softwaresync.RpcCallback;
@@ -46,7 +50,7 @@ import com.azaat.smstereo.imagestreaming.FileTransferUtils;
 // Note : Needs Network permissions.
 
 /** Controller managing setup and tear down the SoftwareSync object. */
-public class SoftwareSyncController implements Closeable {
+public class SoftwareSyncController implements Closeable, OnSyncFrameAvailable {
 
     private static final String TAG = "SoftwareSyncController";
     private final CameraActivity context;
@@ -254,6 +258,15 @@ public class SoftwareSyncController implements Closeable {
                     }
                     statusView.setText(msg.toString());
                 });
+    }
+
+    public void onSyncFrameAvailable(@NonNull SynchronizedFrame frame) {
+        if (!isLeader()) {
+            SoftwareSyncClient softwareSyncClient = (SoftwareSyncClient)softwareSync;
+            softwareSyncClient.getStreamClient().onVideoFrame(frame);
+        } else {
+            softwareSync.getStreamServer().onSyncFrameAvailable(frame);
+        }
     }
 
     @Override

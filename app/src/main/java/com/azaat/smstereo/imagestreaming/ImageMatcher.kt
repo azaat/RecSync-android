@@ -1,22 +1,17 @@
 package com.azaat.smstereo.imagestreaming
 
 import android.util.Log
-import com.azaat.smstereo.ImagePairAvailableListener
-import com.azaat.smstereo.depthestimation.StereoDepth
+import com.azaat.smstereo.OnImagePairAvailableListener
 import com.googleresearch.capturesync.CameraActivity
 import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
-import java.io.FileInputStream
 
-class ImageMatcher(private val context: CameraActivity, private val imagePairAvailableListener: ImagePairAvailableListener) {
-    val stereoDepth: StereoDepth = StereoDepth(FileInputStream(context.getExternalFilesDir(null).toString() + "/calib_params.xml").readBytes())
-
+class ImageMatcher(private val latestFramesBuffer: ArrayDeque<SynchronizedFrame>, private val imagePairAvailableListener: OnImagePairAvailableListener) {
     fun onClientImageAvailable(clientFrame: SynchronizedFrame, timeDomainConverter: SoftwareSyncBase) {
         // takes client frame with timestamp, finds a leader frame with a matching timestamp
         val timestamp = clientFrame.timestampNs
-        val latestFrames = context.latestFrames
-        if (!latestFrames.isEmpty()) {
-            val matchingFrame = latestFrames.stream()
+        if (!latestFramesBuffer.isEmpty()) {
+            val matchingFrame = latestFramesBuffer.stream()
                 .filter { leaderFrame: SynchronizedFrame -> leaderFrame.timestampNs - timestamp < MATCHING_THRESHOLD }
                 .min(Comparator.comparingLong { leaderFrame: SynchronizedFrame ->
                     Math.abs(
@@ -29,18 +24,13 @@ class ImageMatcher(private val context: CameraActivity, private val imagePairAva
                 val delay = timestamp - timeDomainConverter.leaderTimeNs
                 Log.d(TAG, "Delay: $delay")
 
-                imagePairAvailableListener.onImagePairAvailable(timestamp, matchingFrame.timestampNs)
-                val bitmap = stereoDepth.onImagePairAvailable(clientFrame, matchingFrame)
-                context.displayStreamFrame(SynchronizedFrame(bitmap, clientFrame.timestampNs));
+                imagePairAvailableListener.onImagePairAvailable(leaderFrame = matchingFrame, clientFrame = clientFrame)
             } else {
                 Log.d(TAG, "Match not found")
                 Log.d(TAG, "Client: $timestamp")
-                Log.d(TAG, "Leader ts: $latestFrames")
+                Log.d(TAG, "Leader ts: $latestFramesBuffer")
             }
         }
-
-
-
     }
 
     companion object {

@@ -1,18 +1,23 @@
 package com.azaat.smstereo
 
 import android.util.Log
+import com.azaat.smstereo.depthestimation.StereoDepth
+import com.googleresearch.capturesync.FileOperations
+import com.googleresearch.capturesync.SynchronizedFrame
 import java.io.File
+import java.io.FileInputStream
 
 /**
  * Should be instantiated only on leader;
  * handles events associated with stereo processing
  */
-class StereoController () : ImagePairAvailableListener{
+class StereoController (val cameraView: CameraView, val fileOperations: FileOperations) : OnImagePairAvailableListener {
     /**
      * TODO: modifications in UI based on the state of StereoController?
      */
     var stereoControllerState = StereoControllerStates.UNCALIBRATED
         private set
+    val stereoDepth: StereoDepth = StereoDepth(FileInputStream("${fileOperations.getExternalDir()}/calib_params.xml").readBytes())
 
     /**
      * Records a stereo sequence, processes recorded frames
@@ -26,8 +31,6 @@ class StereoController () : ImagePairAvailableListener{
      */
     @Throws(RuntimeException::class)
     fun runStereoRecordingWithDepth() {
-
-
         if (stereoControllerState == StereoControllerStates.UNCALIBRATED) {
             throw RuntimeException("Calibration data unavailable")
         }
@@ -45,11 +48,13 @@ class StereoController () : ImagePairAvailableListener{
 
     }
 
-    public override fun onImagePairAvailable(
-        clientFrameTimestampNs: Long,
-        leaderFrameTimestampNs: Long
+    override fun onImagePairAvailable(
+        clientFrame: SynchronizedFrame,
+        leaderFrame: SynchronizedFrame
     ) {
-        Log.d(TAG, "$clientFrameTimestampNs $leaderFrameTimestampNs")
+        Log.d(TAG, "${leaderFrame.timestampNs} ${clientFrame.timestampNs}")
+        val depthBitmap = stereoDepth.onImagePairAvailable(clientFrame, leaderFrame)
+        cameraView.displayFrame(depthBitmap)
     }
 
     companion object {

@@ -62,6 +62,9 @@ import android.widget.SeekBar.OnSeekBarChangeListener;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
+
+import com.azaat.smstereo.CameraView;
 import com.googleresearch.capturesync.softwaresync.CSVLogger;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncClient;
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncLeader;
@@ -94,7 +97,7 @@ import java.util.stream.Collectors;
 /**
  * Main activity for the libsoftwaresync demo app using the camera 2 API.
  */
-public class CameraActivity extends Activity implements FrameInfo {
+public class CameraActivity extends Activity implements CameraView, FileOperations {
     public static final String SUBDIR_NAME = "RecSync";
     private static final String TAG = "MainActivity";
     private static final int STATIC_LEN = 15_000;
@@ -186,13 +189,9 @@ public class CameraActivity extends Activity implements FrameInfo {
         return lastTimeStamp;
     }
 
-    public ArrayDeque<SynchronizedFrame> getLatestFrames() {
-        return latestFrames;
-    }
-
-    public void displayStreamFrame(SynchronizedFrame streamFrame) {
+    public void displayFrame(@NonNull Bitmap frameBitmap) {
         runOnUiThread(
-                () -> streamImageView.setImageBitmap(streamFrame.getBitmap())
+                () -> streamImageView.setImageBitmap(frameBitmap)
         );
     }
 
@@ -584,18 +583,7 @@ public class CameraActivity extends Activity implements FrameInfo {
         return softwareSyncController.isLeader();
     }
 
-    public void onStreamFrame(Bitmap bitmap, long timestampNs) {
-        if (!isLeader()) {
-            SoftwareSyncClient softwareSyncClient = (SoftwareSyncClient) softwareSyncController.softwareSync;
-            softwareSyncClient.getStreamClient().onVideoFrame(new SynchronizedFrame(bitmap, timestampNs));
-        } else {
-            latestFrames.add(new SynchronizedFrame(bitmap, timestampNs));
-            if (latestFrames.size() > LATEST_FRAMES_CAP) {
-                latestFrames.getFirst().close();
-                latestFrames.removeFirst();
-            }
-        }
-    }
+
 
     private PhaseConfig loadPhaseConfigFile() throws JSONException {
         // Load phase config file and pass to phase aligner.

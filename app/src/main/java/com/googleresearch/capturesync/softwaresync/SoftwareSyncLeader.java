@@ -16,12 +16,10 @@
 
 package com.googleresearch.capturesync.softwaresync;
 
-import android.graphics.Camera;
 import android.util.Log;
 
 import com.azaat.smstereo.StereoController;
 import com.googleresearch.capturesync.CameraActivity;
-import com.googleresearch.capturesync.FrameInfo;
 
 import java.io.IOException;
 import java.net.InetAddress;
