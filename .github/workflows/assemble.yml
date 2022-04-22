@@ -28,15 +28,18 @@ jobs:
         run: ./gradlew assembleRelease
 
       - name: Run lint for release
+        continue-on-error: true
         run: ./gradlew lintRelease
 
       - name: Assemble debug
         run: ./gradlew assembleDebug
 
       - name: Run lint for debug
+        continue-on-error: true
         run: ./gradlew lintDebug
 
       - name: Upload lint results
+        continue-on-error: true
         uses: actions/upload-artifact@v2
         with:
           name: lint-results
