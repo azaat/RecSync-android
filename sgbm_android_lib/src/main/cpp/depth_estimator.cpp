@@ -88,8 +88,8 @@ void DepthEstimator::calcDepth(cv::InputArray leftImage, cv::InputArray rightIma
     cv::remap(leftImage, leftImage_, mLeftMap.first, mLeftMap.second, cv::INTER_LINEAR);
     cv::remap(rightImage, rightImage_, mRightMap.first, mRightMap.second, cv::INTER_LINEAR);
 
-    cv::resize(leftImage, leftImage_, imageSize);
-    cv::resize(rightImage, rightImage_, imageSize);
+    cv::resize(leftImage_, leftImage_, imageSize);
+    cv::resize(rightImage_, rightImage_, imageSize);
 
     // TODO: remove consts
     getDisparity(leftImage_, rightImage_, depthMap, 0, 112, 3);
