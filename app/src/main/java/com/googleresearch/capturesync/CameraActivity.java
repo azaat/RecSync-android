@@ -139,7 +139,6 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
     private ImageButton recordButton;
     private Button getPeriodButton;
     private Button phaseAlignButton;
-    private Button calibrateButton;
     private SeekBar exposureSeekBar;
     private SeekBar sensitivitySeekBar;
     private TextView statusTextView;
@@ -450,7 +449,6 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
             getPeriodButton.setVisibility(View.INVISIBLE);
             exposureSeekBar.setVisibility(View.VISIBLE);
             sensitivitySeekBar.setVisibility(View.VISIBLE);
-            calibrateButton.setVisibility(View.VISIBLE);
 
             recordButton.setOnClickListener(
                     view -> {
@@ -705,7 +703,7 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
         recordButton = findViewById(R.id.record_button);
         phaseAlignButton = findViewById(R.id.phase_align_button);
         getPeriodButton = findViewById(R.id.get_period_button);
-        calibrateButton = findViewById(R.id.calibrate_button);
+//        calibrateButton = findViewById(R.id.calibrate_button);
 
         exposureSeekBar = findViewById(R.id.exposure_seekbar);
         sensitivitySeekBar = findViewById(R.id.sensitivity_seekbar);
