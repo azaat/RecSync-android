@@ -17,7 +17,7 @@ set -eo
 
 # Split two videos to frames
 ./extract.sh "$1" 1 
-./extract.sh "$2" 2 
+# ./extract.sh "$2" 2 
 
 # Find matching frames
 python ./get_match.py

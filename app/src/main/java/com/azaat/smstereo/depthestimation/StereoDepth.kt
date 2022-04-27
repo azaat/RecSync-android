@@ -17,7 +17,6 @@ class StereoDepth(params: ByteArray, val yuvOutputSize: Size) {
         clientFrame: SynchronizedFrame,
         leaderFrame: SynchronizedFrame
     ): Bitmap {
-        // TODO: left-right disambiguation
         var stream = ByteArrayOutputStream()
         clientFrame.bitmap.compress(Bitmap.CompressFormat.JPEG, 100, stream)
         val byteArrayClient: ByteArray = stream.toByteArray()
@@ -26,7 +25,7 @@ class StereoDepth(params: ByteArray, val yuvOutputSize: Size) {
         val byteArrayLeader: ByteArray = stream.toByteArray()
 
         val depthBitmap =  depthArrayToBitmap(
-            getDepthMap(byteArrayLeader,byteArrayClient, yuvOutputSize.width, yuvOutputSize.height),
+            getDepthMap(byteArrayClient,byteArrayLeader, yuvOutputSize.width, yuvOutputSize.height),
             yuvOutputSize.width,
             yuvOutputSize.height
         )

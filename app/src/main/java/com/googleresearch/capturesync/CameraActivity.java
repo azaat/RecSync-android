@@ -479,14 +479,6 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
                                 .broadcastRpc(SoftwareSyncController.METHOD_DO_PHASE_ALIGN, "");
                     });
 
-            calibrateButton.setOnClickListener(
-                    view -> {
-                        SoftwareSyncLeader softwareSyncLeader = ((SoftwareSyncLeader) softwareSyncController.softwareSync);
-                        // TODO: how to set up interaction (StereoController <-> UI in Activity) correctly?
-                        softwareSyncLeader.getStereoController().runStereoCalibration();
-                    }
-            );
-
             exposureSeekBar.setOnSeekBarChangeListener(
                     new OnSeekBarChangeListener() {
                         @Override

@@ -18,7 +18,7 @@ fun depthArrayToBitmap(depthArray: FloatArray, width: Int, height: Int): Bitmap 
     val buffer = IntBuffer.allocate(depthArray.size).apply {
         val alpha = MAX_COLOR shl 24
         depthArray.forEach { depth ->
-            val normalized = (depth.coerceAtLeast(0f) / max * MAX_COLOR).toInt()
+            val normalized = MAX_COLOR - (depth.coerceAtLeast(0f) / max * MAX_COLOR).toInt()
             put(alpha or (normalized shl 16) or (normalized shl 8) or normalized)
         }
         rewind()
