@@ -7,18 +7,17 @@ import java.nio.IntBuffer
 private const val TAG = "Conversions"
 
 private const val MAX_COLOR = 0xff
+private const val MAX_DEPTH = 5f
 
 fun depthArrayToBitmap(depthArray: FloatArray, width: Int, height: Int): Bitmap {
     Log.i(
         TAG,
         "Converting depth array of size ${depthArray.size} to a Bitmap of size $width x $height = ${width * height}"
     )
-
-    val max = depthArray.maxOfOrNull { it }?.coerceAtLeast(Float.MIN_VALUE) ?: Float.MIN_VALUE
     val buffer = IntBuffer.allocate(depthArray.size).apply {
         val alpha = MAX_COLOR shl 24
         depthArray.forEach { depth ->
-            val normalized = MAX_COLOR - (depth.coerceAtLeast(0f) / max * MAX_COLOR).toInt()
+            val normalized = MAX_COLOR - (depth.coerceAtLeast(0f).coerceAtMost(MAX_DEPTH) / MAX_DEPTH * MAX_COLOR).toInt()
             put(alpha or (normalized shl 16) or (normalized shl 8) or normalized)
         }
         rewind()

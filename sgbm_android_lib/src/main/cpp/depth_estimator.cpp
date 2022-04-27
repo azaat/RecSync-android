@@ -56,7 +56,7 @@ void DepthEstimator::getDisparity(cv::InputArray leftImage, cv::InputArray right
             uniquenessRatio,
             speckleWindowSize,
             speckleRange,
-            cv::StereoSGBM::MODE_SGBM_3WAY
+            cv::StereoSGBM::MODE_HH
     );
     sgbm->compute(leftImageGray, rightImageGray, dst);
 }
