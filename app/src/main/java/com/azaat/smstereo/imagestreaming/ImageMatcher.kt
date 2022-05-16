@@ -18,7 +18,7 @@ class ImageMatcher(
         if (!latestFramesBuffer.isEmpty()) {
             val matchingFrame =
                 latestFramesBuffer.minByOrNull { leaderFrame -> Math.abs(leaderFrame.timestampNs - timestamp) }
-            if (matchingFrame != null && matchingFrame.timestampNs < MATCHING_THRESHOLD) {
+            if (matchingFrame != null && Math.abs(matchingFrame.timestampNs - timestamp) < MATCHING_THRESHOLD) {
                 Log.d(
                     TAG,
                     "Found match for the client frame: ${matchingFrame.timestampNs} $timestamp"

@@ -249,7 +249,7 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
 
         createUi();
         setupPhaseAlignController();
-        latestFrames = new ArrayDeque<SynchronizedFrame>();
+        latestFrames = new ArrayDeque<>();
 
         // Query for camera characteristics and cache them.
         try {
@@ -558,7 +558,7 @@ public class CameraActivity extends Activity implements CameraView, FileOperatio
         }
         try {
             softwareSyncController =
-                    new SoftwareSyncController(this, phaseAlignController, softwaresyncStatusTextView);
+                    new SoftwareSyncController(this, phaseAlignController, softwaresyncStatusTextView, yuvImageResolution);
             setLeaderClientControls(softwareSyncController.isLeader());
         } catch (IllegalStateException e) {
             // If wifi is disabled, start pick wifi activity.

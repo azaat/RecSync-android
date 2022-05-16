@@ -22,6 +22,7 @@ import android.graphics.Color;
 import android.net.wifi.WifiManager;
 import android.provider.Settings.Secure;
 import android.util.Log;
+import android.util.Size;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -56,6 +57,7 @@ public class SoftwareSyncController implements Closeable, OnSyncFrameAvailable {
     private final CameraActivity context;
     private final TextView statusView;
     private final PhaseAlignController phaseAlignController;
+    private final Size yuvImageResolution;
     private boolean isLeader;
     SoftwareSyncBase softwareSync;
 
@@ -77,10 +79,11 @@ public class SoftwareSyncController implements Closeable, OnSyncFrameAvailable {
      * TextView used to show currently connected clients on the leader device.
      */
     public SoftwareSyncController(
-            CameraActivity context, PhaseAlignController phaseAlignController, TextView statusView) {
+            CameraActivity context, PhaseAlignController phaseAlignController, TextView statusView, Size yuvImageResolution) {
         this.context = context;
         this.phaseAlignController = phaseAlignController;
         this.statusView = statusView;
+        this.yuvImageResolution = yuvImageResolution;
 
         setupSoftwareSync();
     }
@@ -173,7 +176,7 @@ public class SoftwareSyncController implements Closeable, OnSyncFrameAvailable {
             leaderRpcs.put(SyncConstants.METHOD_MSG_REMOVED_CLIENT, payload -> updateClientsUI());
             leaderRpcs.put(SyncConstants.METHOD_MSG_SYNCING, payload -> updateClientsUI());
             leaderRpcs.put(SyncConstants.METHOD_MSG_OFFSET_UPDATED, payload -> updateClientsUI());
-            softwareSync = new SoftwareSyncLeader(name, initTimeNs, localAddress, leaderRpcs, fileUtils, context);
+            softwareSync = new SoftwareSyncLeader(name, initTimeNs, localAddress, leaderRpcs, fileUtils, context, yuvImageResolution);
         } else {
             // Client.
             Map<Integer, RpcCallback> clientRpcs = new HashMap<>(sharedRpcs);

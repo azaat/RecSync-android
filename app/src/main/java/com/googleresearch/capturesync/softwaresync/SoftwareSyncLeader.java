@@ -17,6 +17,7 @@
 package com.googleresearch.capturesync.softwaresync;
 
 import android.util.Log;
+import android.util.Size;
 
 import com.azaat.smstereo.StereoController;
 import com.googleresearch.capturesync.CameraActivity;
@@ -73,8 +74,9 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
   private final StereoController stereoController;
 
   public SoftwareSyncLeader(
-          String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, CameraActivity context) {
-    this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, context);
+          String name, long initialTime, InetAddress address, Map<Integer, RpcCallback> rpcCallbacks, FileTransferUtils fileUtils, CameraActivity context,
+          Size yuvImageResolution) {
+    this(name, new SystemTicker(), initialTime, address, rpcCallbacks, fileUtils, context, yuvImageResolution);
   }
 
   @SuppressWarnings("FutureReturnValueIgnored")
@@ -85,7 +87,8 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
           InetAddress address,
           Map<Integer, RpcCallback> rpcCallbacks,
           FileTransferUtils fileUtils,
-          CameraActivity context) {
+          CameraActivity context,
+          Size yuvImageResolution) {
     // Note: Leader address is required to be the same as local address.
     super(name, localClock, address, address, fileUtils);
 
@@ -121,7 +124,7 @@ public class SoftwareSyncLeader extends SoftwareSyncBase {
     staleClientChecker.scheduleAtFixedRate(
         this::removeStaleClients, 0, SyncConstants.STALE_TIME_NS, TimeUnit.NANOSECONDS);
 //
-    stereoController = new StereoController(context, context, context.getYuvImageResolution());
+    stereoController = new StereoController(context, context, yuvImageResolution);
     setStreamServer(new BasicStreamServer(fileUtils, context, this, stereoController));
     getStreamServer().start();
   }
