@@ -21,7 +21,7 @@ The two smartphones should be attached to each other firmly (with client smartph
 
 #### Leader smartphone setup
 
-1.  Upload calibration params on the leader smartphone [TODO: how-to and format]
+1.  Upload calibration params on the leader smartphone as an XML file [TODO: how-to and format]
 2.  Start a Wi-Fi hotspot.
 3.  The app should display connected clients and buttons for recording control
 
