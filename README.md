@@ -13,7 +13,7 @@ If you use this application, please cite [Sub-millisecond Video Synchronization 
 ```
 ## Demo-modification of RecSync for stereo depth estimation
 
-
+![stand](https://imgur.com/SjmoqPD.jpg)
 
 ### Usage:
 
@@ -60,14 +60,6 @@ Requirements:
 - Scripts for extraction, alignment and processing of video frames
 - Experiment with flash blinking to evaluate video frames synchronization accuracy
 - Panoramic video demo with automated Hugin stitching
-
-### Panoramic video stitching demo
-
-### [Link to youtube demo video](https://youtu.be/W6iANtCuQ-o)
-
-- We provide scripts to **stitch 2 syncronized smatphone videos** with Hujin panorama CLI tools
-- Usage:
-    - Run ```./make_demo.sh {VIDEO_LEFT} {VIDEO_RIGHT}```
 
 ### This work is based on "Wireless Software Synchronization of Multiple Distributed Cameras"
 
