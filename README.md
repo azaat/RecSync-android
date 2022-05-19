@@ -11,13 +11,19 @@ If you use this application, please cite [Sub-millisecond Video Synchronization 
       primaryClass={cs.CV}
 }
 ```
+## Demo-modification of RecSync for stereo depth estimation
+
+
+
 ### Usage:
 
+The two smartphones should be attached to each other firmly (with client smartphone on the left and leader smartphone on the right).
 
 #### Leader smartphone setup
 
-1.  Start a Wi-Fi hotspot.
-2.  The app should display connected clients and buttons for recording control
+1.  Upload calibration params on the leader smartphone [TODO: how-to and format]
+2.  Start a Wi-Fi hotspot.
+3.  The app should display connected clients and buttons for recording control
 
 #### Client smartphones setup
 
@@ -29,7 +35,8 @@ If you use this application, please cite [Sub-millisecond Video Synchronization 
 2.  Adjust exposure and ISO to your needs.
 3.  Press the ```phase align``` button.
 4.  Press the ```record video``` button to start synchronized video recording.
-5.  Get videos from RecSync folder in smartphone root directory.
+5.  **Leader smartphone should start displaying depth visualization, created with OpenCV and SGBM.**
+6.  Get videos from RecSync folder in application root directory.
 
 #### Extraction and matching of the frames
 
