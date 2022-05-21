@@ -14,7 +14,7 @@ import java.io.FileInputStream
  */
 class StereoController (val cameraView: CameraView, val fileOperations: FileOperations, yuvOutputSize: Size) : OnImagePairAvailableListener {
     val stereoDepth: StereoDepth = StereoDepth(
-        FileInputStream("${fileOperations.getExternalDir()}/calib_params.xml").readBytes(),
+        "${fileOperations.getExternalDir()}/calib_params.xml",
         yuvOutputSize
     )
 
