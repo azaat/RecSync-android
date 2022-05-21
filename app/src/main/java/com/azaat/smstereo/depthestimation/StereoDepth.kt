@@ -4,7 +4,6 @@ import android.graphics.Bitmap
 import android.util.Size
 import com.googleresearch.capturesync.SynchronizedFrame
 import me.timpushkin.sgbmandroid.DepthEstimator
-// import me.timpushkin.sgbm_android_lib.SgbmAndroidLib.loadCalibrationParams
 import java.io.ByteArrayOutputStream
 
 class StereoDepth(paramsPath: String, val yuvOutputSize: Size) {

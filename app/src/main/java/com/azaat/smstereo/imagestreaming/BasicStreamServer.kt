@@ -8,8 +8,6 @@ import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
 import java.net.ServerSocket
-import java.nio.file.Files
-import java.nio.file.Paths
 
 /**
  * Receives images sent from the client smartphone

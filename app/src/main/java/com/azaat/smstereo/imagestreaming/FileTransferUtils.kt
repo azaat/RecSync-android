@@ -4,7 +4,12 @@ import android.content.Context
 import android.graphics.BitmapFactory
 import android.util.Log
 import com.googleresearch.capturesync.SynchronizedFrame
-import java.io.*
+import java.io.BufferedInputStream
+import java.io.BufferedOutputStream
+import java.io.DataInputStream
+import java.io.DataOutputStream
+import java.io.File
+import java.io.IOException
 import java.net.Socket
 import java.nio.file.Files
 import java.nio.file.Paths
@@ -22,8 +27,8 @@ class FileTransferUtils(var mContext: Context) {
      */
     @Throws(IOException::class)
     fun sendFile(
-            file: File,
-            sendSocket: Socket
+        file: File,
+        sendSocket: Socket
     ) {
         val out = BufferedOutputStream(sendSocket.getOutputStream())
         DataOutputStream(out).use { dataOutputStream ->
