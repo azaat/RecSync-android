@@ -3,8 +3,8 @@ package com.azaat.smstereo.depthestimation
 import android.graphics.Bitmap
 import android.util.Size
 import com.googleresearch.capturesync.SynchronizedFrame
-import me.timpushkin.sgbmandroid.DepthEstimator
 import java.io.ByteArrayOutputStream
+import me.timpushkin.sgbmandroid.DepthEstimator
 
 class StereoDepth(paramsPath: String, val yuvOutputSize: Size) {
     private val depthEstimator: DepthEstimator
