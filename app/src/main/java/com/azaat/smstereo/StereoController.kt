@@ -5,14 +5,12 @@ import android.util.Size
 import com.azaat.smstereo.depthestimation.StereoDepth
 import com.googleresearch.capturesync.FileOperations
 import com.googleresearch.capturesync.SynchronizedFrame
-import java.io.File
-import java.io.FileInputStream
 
 /**
  * Should be instantiated only on leader;
  * handles events associated with stereo processing
  */
-class StereoController (val cameraView: CameraView, val fileOperations: FileOperations, yuvOutputSize: Size) : OnImagePairAvailableListener {
+class StereoController(val cameraView: CameraView, val fileOperations: FileOperations, yuvOutputSize: Size) : OnImagePairAvailableListener {
     val stereoDepth: StereoDepth = StereoDepth(
         "${fileOperations.getExternalDir()}/calib_params.xml",
         yuvOutputSize
@@ -30,5 +28,4 @@ class StereoController (val cameraView: CameraView, val fileOperations: FileOper
     companion object {
         const val TAG = "StereoController"
     }
-
 }

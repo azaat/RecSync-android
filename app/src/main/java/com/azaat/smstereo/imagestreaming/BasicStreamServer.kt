@@ -34,14 +34,6 @@ class BasicStreamServer(
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = fileOperations.getExternalDir()
-                val outputDir = Files.createDirectories(
-                    Paths.get(
-                        sdcard.absolutePath,
-                        CameraActivity.SUBDIR_NAME,
-                        tmpPath
-                    )
-                )
                 rpcSocket.reuseAddress = true
                 rpcSocket.soTimeout = SOCKET_WAIT_TIME_MS
                 while (isExecuting) {
@@ -86,5 +78,4 @@ class BasicStreamServer(
         private const val PORT = 6969
         private const val tmpPath = "clientFrames"
     }
-
 }
