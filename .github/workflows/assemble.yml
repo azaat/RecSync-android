@@ -87,7 +87,7 @@ jobs:
         run: chmod +x gradlew
 
       - name: Build Android library
-        run: ./gradlew :sgbmdepth:build
+        run: ./gradlew :sgbmandroid:build
 
       - name: Build Android app
         run: ./gradlew :app:build
