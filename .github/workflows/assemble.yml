@@ -90,5 +90,5 @@ jobs:
         run: ./gradlew :sgbmandroid:build
 
       - name: Build Android app
-        run: ./gradlew :app:build
+        run: ./gradlew :app:assembledebug
 
