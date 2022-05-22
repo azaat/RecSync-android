@@ -1,0 +1,3 @@
+[submodule "SgbmAndroid"]
+	path = SgbmAndroid
+	url = https://github.com/azaat/SgbmAndroid

@@ -9,7 +9,6 @@ import java.net.InetAddress
 import java.net.Socket
 import java.util.concurrent.Executors
 
-
 /**
  * A basic streaming client implementation sending images
  * over sockets
@@ -25,8 +24,6 @@ class BasicStreamClient(private var address: InetAddress, var utils: FileTransfe
                     Log.d(TAG, "Sending frame")
                     clientSocket = Socket(address, PORT)
                     val bitmap = frame.bitmap
-                    var width = bitmap.width
-                    var height = bitmap.height
 
                     val stream = ByteArrayOutputStream()
                     bitmap.compress(Bitmap.CompressFormat.PNG, 100, stream)

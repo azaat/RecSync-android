@@ -8,8 +8,6 @@ import com.googleresearch.capturesync.SynchronizedFrame
 import com.googleresearch.capturesync.softwaresync.SoftwareSyncBase
 import java.io.IOException
 import java.net.ServerSocket
-import java.nio.file.Files
-import java.nio.file.Paths
 
 /**
  * Receives images sent from the client smartphone
@@ -34,14 +32,6 @@ class BasicStreamServer(
         Log.d(TAG, "waiting to accept connection from client...")
         try {
             ServerSocket(PORT).use { rpcSocket ->
-                val sdcard = fileOperations.getExternalDir()
-                val outputDir = Files.createDirectories(
-                    Paths.get(
-                        sdcard.absolutePath,
-                        CameraActivity.SUBDIR_NAME,
-                        tmpPath
-                    )
-                )
                 rpcSocket.reuseAddress = true
                 rpcSocket.soTimeout = SOCKET_WAIT_TIME_MS
                 while (isExecuting) {
@@ -86,5 +76,4 @@ class BasicStreamServer(
         private const val PORT = 6969
         private const val tmpPath = "clientFrames"
     }
-
 }
